@@ -7,6 +7,89 @@ use std::borrow::Cow;
 use super::user::FixedString;
 use super::user::{string_to_fixed, fixed_to_string};
 
+#[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
+pub enum EducationLevel {
+    HighSchool,
+    Bachelor,
+    Master,
+    PhD,
+    Other
+}
+
+impl From<EducationLevel> for u8 {
+    fn from(level: EducationLevel) -> Self {
+        match level {
+            EducationLevel::HighSchool => 0,
+            EducationLevel::Bachelor => 1,
+            EducationLevel::Master => 2,
+            EducationLevel::PhD => 3,
+            EducationLevel::Other => 4,
+        }
+    }
+}
+
+impl From<u8> for EducationLevel {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => EducationLevel::HighSchool,
+            1 => EducationLevel::Bachelor,
+            2 => EducationLevel::Master,
+            3 => EducationLevel::PhD,
+            _ => EducationLevel::Other,
+        }
+    }
+}
+
+#[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
+pub enum EducationStatus {
+    InProgress,
+    Completed,
+    Discontinued,
+    OnHold
+}
+
+impl From<EducationStatus> for u8 {
+    fn from(status: EducationStatus) -> Self {
+        match status {
+            EducationStatus::InProgress => 0,
+            EducationStatus::Completed => 1,
+            EducationStatus::Discontinued => 2,
+            EducationStatus::OnHold => 3,
+        }
+    }
+}
+
+impl From<u8> for EducationStatus {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => EducationStatus::InProgress,
+            1 => EducationStatus::Completed,
+            2 => EducationStatus::Discontinued,
+            _ => EducationStatus::OnHold,
+        }
+    }
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct EducationRecord {
+    pub id: String,
+    pub user_id: String,
+    pub school_name: String,
+    pub track: String,
+    pub university_name: String,
+    pub major: String,
+    pub city: String,
+    pub country: String,
+    pub education_level: EducationLevel,
+    pub status: EducationStatus,
+    pub start_year: u32,
+    pub end_year: Option<u32>,
+    pub gpa: Option<u32>,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub universities: Vec<UniversityEducation>,
+}
+
 #[derive(Clone, Debug)]
 pub struct StableEducationRecord {
     pub id: FixedString,
@@ -133,3 +216,176 @@ impl BoundedStorable for StableEducationRecord {
     const MAX_SIZE: u32 = (32 * 8) + 2 + 4 + 5 + 5 + 16; 
     const IS_FIXED_SIZE: bool = true;
 }
+
+impl EducationRecord {  
+    pub fn new(id: String, user_id: String) -> Self {
+        let timestamp = time();
+        Self {
+            id,
+            user_id,
+            school_name: String::new(),
+            track: String::new(),
+            university_name: String::new(),
+            major: String::new(),
+            city: String::new(),
+            country: String::new(),
+            education_level: EducationLevel::HighSchool,
+            status: EducationStatus::InProgress,
+            start_year: 0,
+            end_year: None,
+            gpa: None,
+            created_at: timestamp,
+            updated_at: timestamp,
+            universities: Vec::new(),
+        }
+    }
+
+    pub fn add_high_school(&mut self, high_school: HighSchoolEducation) {
+        self.school_name = high_school.school_name;
+        self.track = high_school.track;
+        self.city = high_school.city;
+        self.country = high_school.country;
+        self.education_level = EducationLevel::HighSchool;
+        self.status = high_school.status;
+        self.start_year = high_school.start_year;
+        self.end_year = high_school.end_year;
+        self.gpa = None;
+        self.updated_at = time();
+    }
+
+    pub fn add_university(&mut self, university: UniversityEducation) {
+        self.university_name = university.university_name.clone();
+        self.major = university.major.clone();
+        self.city = university.city.clone();
+        self.country = university.country.clone();
+        self.education_level = university.level.clone();
+        self.status = university.status.clone();
+        self.start_year = university.start_year;
+        self.end_year = university.end_year;
+        self.gpa = university.gpa.map(|gpa| (gpa * 100.0) as u32);
+        self.universities.push(university);
+        self.updated_at = time();
+    }
+
+    pub fn clear_universities(&mut self) {
+        self.universities.clear();
+    }
+}
+
+impl From<StableEducationRecord> for EducationRecord {
+    fn from(record: StableEducationRecord) -> Self {
+        Self {
+            id: fixed_to_string(&record.id),
+            user_id: fixed_to_string(&record.user_id),
+            school_name: fixed_to_string(&record.school_name),
+            track: fixed_to_string(&record.track),
+            university_name: fixed_to_string(&record.university_name),
+            major: fixed_to_string(&record.major),
+            city: fixed_to_string(&record.city),
+            country: fixed_to_string(&record.country),
+            education_level: record.education_level.into(),
+            status: record.status.into(),
+            start_year: record.start_year,
+            end_year: record.end_year,
+            gpa: record.gpa,
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+            universities: Vec::new(), // Add this field
+        }
+    }
+}
+
+impl From<EducationRecord> for StableEducationRecord {
+    fn from(record: EducationRecord) -> Self {
+        Self {
+            id: string_to_fixed(&record.id),
+            user_id: string_to_fixed(&record.user_id),
+            school_name: string_to_fixed(&record.school_name),
+            track: string_to_fixed(&record.track),
+            university_name: string_to_fixed(&record.university_name),
+            major: string_to_fixed(&record.major),
+            city: string_to_fixed(&record.city),
+            country: string_to_fixed(&record.country),
+            education_level: record.education_level.into(),
+            status: record.status.into(),
+            start_year: record.start_year,
+            end_year: record.end_year,
+            gpa: record.gpa,
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+        }
+    }
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct HighSchoolEducation {
+    pub school_name: String,
+    pub track: String,
+    pub city: String,
+    pub country: String,
+    pub start_year: u32,
+    pub end_year: Option<u32>,
+    pub status: EducationStatus,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct UniversityEducation {
+    pub university_name: String,
+    pub level: EducationLevel,
+    pub major: String,
+    pub city: String,
+    pub country: String,
+    pub start_year: u32,
+    pub end_year: Option<u32>,
+    pub gpa: Option<f32>,
+    pub status: EducationStatus,
+}
+
+impl HighSchoolEducation {
+    pub fn new(
+        school_name: String,
+        track: String,
+        city: String,
+        country: String,
+        start_year: u32,
+        end_year: Option<u32>,
+        status: EducationStatus,
+    ) -> Self {
+        Self {
+            school_name,
+            track,
+            city,
+            country,
+            start_year,
+            end_year,
+            status,
+        }
+    }
+}
+
+impl UniversityEducation {
+    pub fn new(
+        university_name: String,
+        level: EducationLevel,
+        major: String,
+        city: String,
+        country: String,
+        start_year: u32,
+        end_year: Option<u32>,
+        gpa: Option<f32>,
+        status: EducationStatus,
+    ) -> Self {
+        Self {
+            university_name,
+            level,
+            major,
+            city,
+            country,
+            start_year,
+            end_year,
+            gpa,
+            status,
+        }
+    }
+}
+
