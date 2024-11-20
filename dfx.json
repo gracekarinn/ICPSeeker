@@ -1,0 +1,27 @@
+{
+  "canisters": {
+    "icpseeker_backend": {
+      "candid": "src/icpseeker_backend/icpseeker_backend.did",
+      "package": "icpseeker_backend",
+      "type": "rust"
+    },
+    "icpseeker_frontend": {
+      "dependencies": [
+        "icpseeker_backend"
+      ],
+      "source": [
+        "src/icpseeker_frontend/dist"
+      ],
+      "type": "assets",
+      "workspace": "icpseeker_frontend"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
