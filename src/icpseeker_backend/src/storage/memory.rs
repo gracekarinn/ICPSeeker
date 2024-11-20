@@ -1,19 +1,23 @@
 use crate::validation::ValidationService;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
+use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap, Storable};
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 use crate::models::{
     UserProfile,
-    user::{StableUserProfile, string_to_fixed, FixedString},
+    user::{StableUserProfile, string_to_fixed, fixed_to_string, FixedString},
     education::{EducationRecord, StableEducationRecord},
     bank::{BankInformation, StableBankInformation},
+    cv::{CV, StableCV, CVAnalysisStatus},
 };
-use crate::StorageError;
+use crate::types::errors::StorageError;
 
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
 const MEMORY_ID_BANK: MemoryId = MemoryId::new(2);
+const CV_MEM_ID: MemoryId = MemoryId::new(4);
+type CVMemory = VirtualMemory<DefaultMemoryImpl>;
 
 
 thread_local! {
@@ -38,6 +42,12 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_BANK))
         )
     );
+
+    static CV_STORAGE: RefCell<StableBTreeMap<FixedString, StableCV, CVMemory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(CV_MEM_ID))
+        )
+    );
 }
 
 pub struct UserStorage;
@@ -48,6 +58,13 @@ impl UserStorage {
         USERS.with(|users| {
             users.borrow_mut().insert(stable_user.id, stable_user);
             Ok(())
+        })
+    }
+
+    pub fn exists(id: &str) -> bool {
+        let fixed_id = string_to_fixed(id);
+        USERS.with(|users| {
+            users.borrow().contains_key(&fixed_id)
         })
     }
 
@@ -253,3 +270,95 @@ impl BankStorage {
     }
 }
 
+pub struct CVStorage;
+
+impl CVStorage {
+    pub fn store_cv(cv: CV) -> Result<(), StorageError> {
+        let stable_cv = StableCV::from(cv);
+        CV_STORAGE.with(|storage| {
+            storage.borrow_mut().insert(stable_cv.id, stable_cv);
+            Ok(())
+        })
+    }
+
+    pub fn get_cv(id: &str) -> Result<CV, StorageError> {
+        let fixed_id = string_to_fixed(id);
+        CV_STORAGE.with(|storage| {
+            storage
+                .borrow()
+                .get(&fixed_id)
+                .map(|cv| CV::from(cv))
+                .ok_or_else(|| StorageError::NotFound("CV not found".to_string()))
+        })
+    }
+
+    pub fn get_user_cvs(user_id: &str) -> Result<Vec<CV>, StorageError> {
+        let fixed_user_id = string_to_fixed(user_id);
+        CV_STORAGE.with(|storage| {
+            let cvs: Vec<CV> = storage
+                .borrow()
+                .iter()
+                .filter(|(_, cv)| cv.user_id == fixed_user_id)
+                .map(|(_, cv)| CV::from(cv))
+                .collect();
+
+            if cvs.is_empty() {
+                Err(StorageError::NotFound("No CVs found for user".to_string()))
+            } else {
+                Ok(cvs)
+            }
+        })
+    }
+
+    pub fn update_cv(cv: CV) -> Result<(), StorageError> {
+        let stable_cv = StableCV::from(cv);
+        CV_STORAGE.with(|storage| {
+            if !storage.borrow().contains_key(&stable_cv.id) {
+                return Err(StorageError::NotFound("CV not found".to_string()));
+            }
+            storage.borrow_mut().insert(stable_cv.id, stable_cv);
+            Ok(())
+        })
+    }
+
+    pub fn delete_cv(id: &str) -> Result<(), StorageError> {
+        let fixed_id = string_to_fixed(id);
+        CV_STORAGE.with(|storage| {
+            if storage.borrow_mut().remove(&fixed_id).is_none() {
+                return Err(StorageError::NotFound("CV not found".to_string()));
+            }
+            Ok(())
+        })
+    }
+
+    pub fn update_ai_analysis(
+        id: &str, 
+        status: CVAnalysisStatus, 
+        feedback: Option<String>
+    ) -> Result<(), StorageError> {
+        let fixed_id = string_to_fixed(id);
+        CV_STORAGE.with(|storage| {
+            let mut storage = storage.borrow_mut();
+            
+            if let Some(cv) = storage.get(&fixed_id) {
+                let mut regular_cv = CV::from(cv);
+                regular_cv.ai_analysis_status = status;
+                regular_cv.ai_feedback = feedback;
+                regular_cv.updated_at = ic_cdk::api::time();
+                
+                let stable_cv = StableCV::from(regular_cv);
+                storage.insert(fixed_id, stable_cv);
+                Ok(())
+            } else {
+                Err(StorageError::NotFound("CV not found".to_string()))
+            }
+        })
+    }
+}
+
+#[cfg(test)]
+pub fn clear_cv_storage() {
+    CV_STORAGE.with(|storage| {
+        storage.borrow_mut().clear();
+    });
+}
