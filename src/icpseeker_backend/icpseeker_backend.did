@@ -156,6 +156,46 @@ type BankResponse = variant {
     Error: text;
 };
 
+type CreateCVPayload = record {
+    title: text;
+    content: text;
+};
+
+type UpdateCVPayload = record {
+    id: text;
+    title: text;
+    content: text;
+};
+
+type CVAnalysisStatus = variant {
+    NotAnalyzed;
+    InProgress;
+    Completed;
+};
+
+type CV = record {
+    id: text;
+    user_id: text;
+    title: text;
+    content: text;
+    version: nat32;
+    created_at: nat64;
+    updated_at: nat64;
+    ai_analysis_status: CVAnalysisStatus;
+    ai_feedback: opt text;
+};
+
+type CVResponse = record {
+    cv: opt CV;
+    message: text;
+};
+
+type CVListResponse = record {
+    cvs: vec CV;
+    message: text;
+};
+
+
 service : {
     create_user: (CreateUserPayload) -> (UserResponse);
     get_user: () -> (UserResponse) query;
@@ -168,4 +208,8 @@ service : {
     get_bank_info: () -> (BankResponse) query;
     update_bank_info: (BankInfoPayload) -> (BankResponse);
     get_bank_info_by_user_id: (text) -> (BankResponse) query;
+    "upload_cv": (CreateCVPayload) -> (CVResponse);
+    "get_cv": (text) -> (CVResponse) query;
+    "get_my_cvs": () -> (CVListResponse) query;
+    "update_cv": (UpdateCVPayload) -> (CVResponse);
 };
