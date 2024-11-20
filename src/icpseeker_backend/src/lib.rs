@@ -1,9 +1,8 @@
-use candid::{CandidType, Principal};
-use ic_cdk_macros::{init, query, update}; 
+use candid::CandidType;
 use serde::{Deserialize, Serialize};
 use ic_stable_structures::{
-    memory_manager::{MemoryId, MemoryManager, VirtualMemory},
-    DefaultMemoryImpl
+    memory_manager::MemoryManager,
+    DefaultMemoryImpl,
 };
 use std::cell::RefCell;
 
@@ -12,13 +11,17 @@ mod models;
 mod storage;
 mod types;
 
-use crate::models::user::{UserProfile, Location};
-use crate::storage::memory::UserStorage;
+
+use crate::models::{
+    UserProfile,
+    education::{
+        EducationRecord, EducationLevel, EducationStatus,
+        HighSchoolEducation, UniversityEducation
+    },
+    bank::BankInformation
+};
+use crate::storage::memory::{UserStorage, EducationStorage, BankStorage};
 use crate::types::errors::StorageError;
-use crate::models::education::{EducationRecord, EducationLevel, EducationStatus, HighSchoolEducation, UniversityEducation};
-use crate::storage::memory::EducationStorage;
-use crate::models::bank::BankInformation;
-use crate::storage::memory::BankStorage;
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = RefCell::new(
@@ -26,7 +29,6 @@ thread_local! {
     );
 }
 
-#[init]
 fn init() {
     MEMORY_MANAGER.with(|m| {
         let _ = m.borrow_mut();
@@ -111,7 +113,6 @@ pub enum BankResponse {
 }
 
 
-#[update]
 pub async fn create_user(payload: CreateUserPayload) -> UserResponse {
     let caller = ic_cdk::api::caller();
     let user_id = caller.to_string();
@@ -121,10 +122,8 @@ pub async fn create_user(payload: CreateUserPayload) -> UserResponse {
         payload.name,
         payload.email,
         payload.phone_number,
-        Location {
-            city: payload.city,
-            country: payload.country,
-        },
+        payload.city,
+        payload.country,
     );
 
     match UserStorage::save_with_validation(user.clone()) {
@@ -133,7 +132,6 @@ pub async fn create_user(payload: CreateUserPayload) -> UserResponse {
     }
 }
 
-#[query]
 pub async fn get_user() -> UserResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -144,7 +142,6 @@ pub async fn get_user() -> UserResponse {
 }
 
 
-#[query]
 pub async fn get_user_by_id(user_id: String) -> UserResponse {
     let caller = ic_cdk::api::caller().to_string();
 
@@ -155,7 +152,6 @@ pub async fn get_user_by_id(user_id: String) -> UserResponse {
     }
 }
 
-#[update]
 pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -174,10 +170,10 @@ pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
         user.phone_number = phone;
     }
     if let Some(city) = payload.city {
-        user.location.city = city;
+        user.city = city;
     }
     if let Some(country) = payload.country {
-        user.location.country = country;
+        user.country = country;
     }
     
     user.updated_at = ic_cdk::api::time();
@@ -188,12 +184,11 @@ pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
     }
 }
 
-#[update]
 pub async fn add_education(payload: EducationPayload) -> EducationResponse {
     let user_id = ic_cdk::api::caller().to_string();
     let education_id = format!("EDU_{}", user_id);
 
-    let mut education_record = EducationRecord::new(education_id.clone(), user_id.clone());
+    let mut education_record = EducationRecord::new(education_id, user_id);
 
     if let Some(hs_payload) = payload.high_school {
         let high_school = HighSchoolEducation::new(
@@ -209,6 +204,7 @@ pub async fn add_education(payload: EducationPayload) -> EducationResponse {
     }
 
     if let Some(uni_payloads) = payload.university {
+        education_record.clear_universities(); 
         for uni_payload in uni_payloads {
             let university = UniversityEducation::new(
                 uni_payload.university_name,
@@ -231,7 +227,6 @@ pub async fn add_education(payload: EducationPayload) -> EducationResponse {
     }
 }
 
-#[query]
 pub async fn get_education() -> EducationResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -241,7 +236,6 @@ pub async fn get_education() -> EducationResponse {
     }
 }
 
-#[update]
 pub async fn update_education(payload: EducationPayload) -> EducationResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -264,7 +258,7 @@ pub async fn update_education(payload: EducationPayload) -> EducationResponse {
     }
 
     if let Some(uni_payloads) = payload.university {
-        education_record.university.clear(); // Clear existing records
+        education_record.universities.clear(); 
         for uni_payload in uni_payloads {
             let university = UniversityEducation::new(
                 uni_payload.university_name,
@@ -287,7 +281,6 @@ pub async fn update_education(payload: EducationPayload) -> EducationResponse {
     }
 }
 
-#[update]
 pub async fn add_bank_info(payload: BankInfoPayload) -> BankResponse {
     let user_id = ic_cdk::api::caller().to_string();
     let bank_id = format!("BANK_{}", user_id);
@@ -309,7 +302,6 @@ pub async fn add_bank_info(payload: BankInfoPayload) -> BankResponse {
     }
 }
 
-#[query]
 pub async fn get_bank_info() -> BankResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -319,7 +311,6 @@ pub async fn get_bank_info() -> BankResponse {
     }
 }
 
-#[update]
 pub async fn update_bank_info(payload: BankInfoPayload) -> BankResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -342,7 +333,6 @@ pub async fn update_bank_info(payload: BankInfoPayload) -> BankResponse {
     }
 }
 
-#[query]
 pub async fn get_bank_info_by_user_id(user_id: String) -> BankResponse {
     match BankStorage::get_by_user(&user_id) {
         Some(info) => BankResponse::Success(info),
