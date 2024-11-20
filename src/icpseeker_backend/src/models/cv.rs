@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use ic_cdk::api::time;
 use std::borrow::Cow;
 use ic_stable_structures::{Storable, BoundedStorable};
+use super::user::{string_to_fixed, fixed_to_string};
 
 pub type FixedString = [u8; 32];
 pub type FixedContent = [u8; 1024]; 
@@ -56,39 +57,31 @@ impl Storable for StableCV {
     }
 
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        let mut pos = 0;
-        let mut next_fixed_str = || {
+        fn read_fixed_string(bytes: &[u8], start: usize) -> FixedString {
             let mut arr = [0u8; 32];
-            arr.copy_from_slice(&bytes[pos..pos + 32]);
-            pos += 32;
+            arr.copy_from_slice(&bytes[start..start + 32]);
             arr
-        };
+        }
 
-        let mut next_fixed_content = || {
-            let mut arr = [0u8; 1024];
-            arr.copy_from_slice(&bytes[pos..pos + 1024]);
-            pos += 1024;
-            arr
-        };
-
-        let id = next_fixed_str();
-        let user_id = next_fixed_str();
-        let title = next_fixed_str();
-        let content = next_fixed_content();
+        let mut pos = 0;
+        let id = read_fixed_string(&bytes, pos);
+        pos += 32;
+        let user_id = read_fixed_string(&bytes, pos);
+        pos += 32;
+        let title = read_fixed_string(&bytes, pos);
+        pos += 32;
+        let content = read_fixed_content(&bytes, pos);
+        pos += 1024;
         
         let version = u32::from_be_bytes(bytes[pos..pos + 4].try_into().unwrap());
         pos += 4;
-        
         let created_at = u64::from_be_bytes(bytes[pos..pos + 8].try_into().unwrap());
         pos += 8;
-        
         let updated_at = u64::from_be_bytes(bytes[pos..pos + 8].try_into().unwrap());
         pos += 8;
-        
         let ai_analysis_status = bytes[pos];
         pos += 1;
-        
-        let ai_feedback = next_fixed_content();
+        let ai_feedback = read_fixed_content(&bytes, pos);
 
         Self {
             id,
@@ -169,6 +162,12 @@ impl From<StableCV> for CV {
             ai_feedback: Some(fixed_content_to_string(&cv.ai_feedback)),
         }
     }
+}
+
+fn read_fixed_content(bytes: &[u8], start: usize) -> FixedContent {
+    let mut arr = [0u8; 1024];
+    arr.copy_from_slice(&bytes[start..start + 1024]);
+    arr
 }
 
 fn string_to_fixed_content(s: &str) -> FixedContent {
