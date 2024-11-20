@@ -1,27 +1,23 @@
+type FixedString = vec nat8;
+
 type Location = record {
     city: text;
     country: text;
 };
 
-type UserStatus = variant {
-    Active;
-    Inactive;
-    Pending;
-    Blocked;
-};
-
 type UserProfile = record {
     id: text;
-    status: UserStatus;
-    created_at: nat64;
-    updated_at: nat64;
     name: text;
     email: text;
     phone_number: text;
-    location: Location;
+    city: text;
+    country: text;
     education_id: opt text;
     bank_info_id: opt text;
+    status: nat8; // 0: Active, 1: Inactive, etc.
     profile_completion: nat8;
+    created_at: nat64;
+    updated_at: nat64;
 };
 
 type CreateUserPayload = record {
@@ -50,25 +46,14 @@ type EducationLevel = variant {
     Bachelor;
     Master;
     PhD;
-    Other: text;
+    Other;
 };
 
 type EducationStatus = variant {
-    Ongoing;
-    Graduated;
+    InProgress;
+    Completed;
     Discontinued;
-};
-
-type HighSchoolEducation = record {
-    school_name: text;
-    track: text;
-    city: text;
-    country: text;
-    start_year: nat32;
-    end_year: opt nat32;
-    status: EducationStatus;
-    created_at: nat64;
-    updated_at: nat64;
+    OnHold;
 };
 
 type UniversityEducation = record {
@@ -81,17 +66,35 @@ type UniversityEducation = record {
     end_year: opt nat32;
     gpa: opt float32;
     status: EducationStatus;
-    created_at: nat64;
-    updated_at: nat64;
+};
+
+type HighSchoolEducation = record {
+    school_name: text;
+    track: text;
+    city: text;
+    country: text;
+    start_year: nat32;
+    end_year: opt nat32;
+    status: EducationStatus;
 };
 
 type EducationRecord = record {
     id: text;
     user_id: text;
-    high_school: opt HighSchoolEducation;
-    university: vec UniversityEducation;
+    school_name: text;
+    track: text;
+    university_name: text;
+    major: text;
+    city: text;
+    country: text;
+    education_level: EducationLevel;
+    status: EducationStatus;
+    start_year: nat32;
+    end_year: opt nat32;
+    gpa: opt nat32;
     created_at: nat64;
     updated_at: nat64;
+    universities: vec UniversityEducation;
 };
 
 type HighSchoolPayload = record {
