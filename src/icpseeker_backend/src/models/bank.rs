@@ -6,6 +6,15 @@ use ic_stable_structures::{Storable, BoundedStorable};
 
 pub type FixedString = [u8; 32];
 
+pub fn fixed_to_string(fixed: &FixedString) -> String {
+    String::from_utf8(
+        fixed.iter()
+            .take_while(|&&x| x != 0)
+            .copied()
+            .collect()
+    ).unwrap_or_default()
+}
+
 fn string_to_fixed(s: &str) -> FixedString {
     let mut fixed = [0u8; 32];
     let bytes = s.as_bytes();
@@ -135,6 +144,23 @@ impl BankInformation {
             bank_branch,
             created_at: timestamp,
             updated_at: timestamp,
+        }
+    }
+}
+
+impl From<StableBankInformation> for BankInformation {
+    fn from(info: StableBankInformation) -> Self {
+        Self {
+            id: fixed_to_string(&info.id),
+            user_id: fixed_to_string(&info.user_id),
+            account_holder_name: fixed_to_string(&info.account_holder_name),
+            bank_name: fixed_to_string(&info.bank_name),
+            swift_code: fixed_to_string(&info.swift_code),
+            account_number: fixed_to_string(&info.account_number),
+            bank_country: fixed_to_string(&info.bank_country),
+            bank_branch: None,
+            created_at: info.created_at,
+            updated_at: info.updated_at,
         }
     }
 }
