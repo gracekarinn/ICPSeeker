@@ -1,15 +1,20 @@
 use crate::validation::ValidationService;
-use candid::{CandidType, Decode, Encode};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
 use std::cell::RefCell;
 
-use crate::models::{UserProfile, EducationRecord, BankInformation};
+use crate::models::{
+    UserProfile,
+    user::{StableUserProfile, string_to_fixed, FixedString},
+    education::{EducationRecord, StableEducationRecord},
+    bank::{BankInformation, StableBankInformation},
+};
 use crate::StorageError;
 
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
 const MEMORY_ID_BANK: MemoryId = MemoryId::new(2);
+
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = RefCell::new(
@@ -39,30 +44,26 @@ pub struct UserStorage;
 
 impl UserStorage {
     pub fn save(user: UserProfile) -> Result<(), String> {
+        let stable_user: StableUserProfile = user.into();
         USERS.with(|users| {
-            users.borrow_mut().insert(user.id.clone(), user);
+            users.borrow_mut().insert(stable_user.id, stable_user);
             Ok(())
         })
     }
 
     pub fn get(id: &str) -> Option<UserProfile> {
-        USERS.with(|users| users.borrow().get(id))
-    }
-
-    pub fn update(user: UserProfile) -> Result<(), String> {
+        let fixed_id = string_to_fixed(id);
         USERS.with(|users| {
-            if users.borrow().contains_key(&user.id) {
-                users.borrow_mut().insert(user.id.clone(), user);
-                Ok(())
-            } else {
-                Err("User not found".to_string())
-            }
+            users.borrow().get(&fixed_id)
+                .map(|stable_user| stable_user.into())
         })
     }
 
-    pub fn delete(id: &str) -> Result<(), String> {
+    pub fn update(user: UserProfile) -> Result<(), String> {
+        let stable_user: StableUserProfile = user.into();
         USERS.with(|users| {
-            if users.borrow_mut().remove(id).is_some() {
+            if users.borrow().contains_key(&stable_user.id) {
+                users.borrow_mut().insert(stable_user.id, stable_user);
                 Ok(())
             } else {
                 Err("User not found".to_string())
@@ -71,14 +72,16 @@ impl UserStorage {
     }
 
     pub fn save_with_validation(user: UserProfile) -> Result<(), StorageError> {
-        ValidationService::validate_user(&user)
+        let stable_user: StableUserProfile = user.clone().into();
+        ValidationService::validate_user(&stable_user)
             .map_err(|e| StorageError::ValidationError(format!("{:?}", e)))?;
 
         Self::save(user).map_err(|e| StorageError::SystemError(e))
     }
 
     pub fn update_with_validation(user: UserProfile) -> Result<(), StorageError> {
-        ValidationService::validate_user(&user)
+        let stable_user: StableUserProfile = user.clone().into();
+        ValidationService::validate_user(&stable_user)
             .map_err(|e| StorageError::ValidationError(format!("{:?}", e)))?;
 
         ValidationService::validate_relationships(&user.id)?;
@@ -91,27 +94,35 @@ pub struct EducationStorage;
 
 impl EducationStorage {
     pub fn save(record: EducationRecord) -> Result<(), String> {
+        let stable_record: StableEducationRecord = record.into();
         EDUCATION_RECORDS.with(|records| {
-            records.borrow_mut().insert(record.id.clone(), record);
+            records.borrow_mut().insert(stable_record.id, stable_record);
             Ok(())
         })
     }
 
     pub fn get(id: &str) -> Option<EducationRecord> {
-        EDUCATION_RECORDS.with(|records| records.borrow().get(id))
+        let fixed_id = string_to_fixed(id);
+        EDUCATION_RECORDS.with(|records| {
+            records.borrow().get(&fixed_id)
+                .map(|stable_record| stable_record.into())
+        })
     }
 
     pub fn get_by_user(user_id: &str) -> Option<EducationRecord> {
+        let fixed_user_id = string_to_fixed(user_id);
         EDUCATION_RECORDS.with(|records| {
-            records.borrow().iter().find(|(_, record)| record.user_id == user_id)
-                .map(|(_, record)| record)
+            records.borrow().iter()
+                .find(|(_, record)| record.user_id == fixed_user_id)
+                .map(|(_, record)| record.into())
         })
     }
 
     pub fn update(record: EducationRecord) -> Result<(), String> {
+        let stable_record: StableEducationRecord = record.into();
         EDUCATION_RECORDS.with(|records| {
-            if records.borrow().contains_key(&record.id) {
-                records.borrow_mut().insert(record.id.clone(), record);
+            if records.borrow().contains_key(&stable_record.id) {
+                records.borrow_mut().insert(stable_record.id, stable_record);
                 Ok(())
             } else {
                 Err("Education record not found".to_string())
@@ -120,12 +131,14 @@ impl EducationStorage {
     }
 
     pub fn update_with_validation(record: EducationRecord) -> Result<(), StorageError> {
-        if !EDUCATION_RECORDS.with(|records| records.borrow().contains_key(&record.id)) {
+        let fixed_id = string_to_fixed(&record.id);
+        if !EDUCATION_RECORDS.with(|records| records.borrow().contains_key(&fixed_id)) {
             return Err(StorageError::NotFound("Education record not found".to_string()));
         }
-
+    
+        let stable_record: StableEducationRecord = record.into();
         EDUCATION_RECORDS.with(|records| {
-            records.borrow_mut().insert(record.id.clone(), record);
+            records.borrow_mut().insert(stable_record.id, stable_record);
             Ok(())
         })
     }
@@ -152,50 +165,42 @@ impl EducationStorage {
 
 pub struct BankStorage;
 
+
 impl BankStorage {
     pub fn save(info: BankInformation) -> Result<(), String> {
+        let stable_info: StableBankInformation = info.into();
         BANK_INFO.with(|bank_info| {
-            bank_info.borrow_mut().insert(info.id.clone(), info);
+            bank_info.borrow_mut().insert(stable_info.id, stable_info);
             Ok(())
         })
     }
 
     pub fn get(id: &str) -> Option<BankInformation> {
-        BANK_INFO.with(|bank_info| bank_info.borrow().get(id))
+        let fixed_id = string_to_fixed(id);
+        BANK_INFO.with(|bank_info| {
+            bank_info.borrow().get(&fixed_id)
+                .map(|stable_info| stable_info.into())
+        })
     }
 
     pub fn get_by_user(user_id: &str) -> Option<BankInformation> {
+        let fixed_user_id = string_to_fixed(user_id);
         BANK_INFO.with(|bank_info| {
-            bank_info.borrow().iter().find(|(_, info)| info.user_id == user_id)
-                .map(|(_, info)| info)
+            bank_info.borrow().iter()
+                .find(|(_, info)| info.user_id == fixed_user_id)
+                .map(|(_, info)| info.into())
         })
     }
 
     pub fn update(info: BankInformation) -> Result<(), String> {
+        let stable_info: StableBankInformation = info.into();
         BANK_INFO.with(|bank_info| {
-            if bank_info.borrow().contains_key(&info.id) {
-                bank_info.borrow_mut().insert(info.id.clone(), info);
+            if bank_info.borrow().contains_key(&stable_info.id) {
+                bank_info.borrow_mut().insert(stable_info.id, stable_info);
                 Ok(())
             } else {
                 Err("Bank information not found".to_string())
             }
-        })
-    }
-
-    pub fn update_with_validation(info: BankInformation) -> Result<(), StorageError> {
-        if !BANK_INFO.with(|bank_info| bank_info.borrow().contains_key(&info.id)) {
-            return Err(StorageError::NotFound("Bank information not found".to_string()));
-        }
-
-        if !Self::is_valid_swift(&info.swift_code) {
-            return Err(StorageError::ValidationError(
-                "Invalid SWIFT code format".to_string()
-            ));
-        }
-
-        BANK_INFO.with(|bank_info| {
-            bank_info.borrow_mut().insert(info.id.clone(), info);
-            Ok(())
         })
     }
 
@@ -221,6 +226,25 @@ impl BankStorage {
         }
 
         Self::save(info).map_err(|e| StorageError::SystemError(e))
+    }
+
+    pub fn update_with_validation(info: BankInformation) -> Result<(), StorageError> {
+        let fixed_id = string_to_fixed(&info.id); 
+        if !BANK_INFO.with(|bank_info| bank_info.borrow().contains_key(&fixed_id)) {
+            return Err(StorageError::NotFound("Bank information not found".to_string()));
+        }
+
+        if !Self::is_valid_swift(&info.swift_code) {
+            return Err(StorageError::ValidationError(
+                "Invalid SWIFT code format".to_string()
+            ));
+        }
+
+        let stable_info: StableBankInformation = info.into();
+        BANK_INFO.with(|bank_info| {
+            bank_info.borrow_mut().insert(stable_info.id, stable_info);
+            Ok(())
+        })
     }
 
     pub fn is_valid_swift(code: &str) -> bool {
