@@ -1,8 +1,8 @@
 use crate::models::cv::{CV, CVAnalysisStatus};
-use crate::storage::cv::CVStorage;
+use crate::storage::CVStorage;
 use candid::candid_method;
 use crate::ai_service::CVAnalyzer;
-use ic_cdk_macros::*;
+use ic_cdk_macros::{query, update};
 use candid::CandidType;
 use serde::{Deserialize, Serialize};
 use ic_stable_structures::{
@@ -11,6 +11,7 @@ use ic_stable_structures::{
 };
 use std::cell::RefCell;
 
+pub mod ai_service;
 mod validation;
 mod models;
 mod storage;
@@ -370,13 +371,12 @@ pub async fn get_bank_info_by_user_id(user_id: String) -> BankResponse {
     }
 }
 
-#[ic_cdk_macros::update]
+#[ic_cdk::update]
 #[candid_method(update)]
 pub async fn upload_cv(payload: CreateCVPayload) -> CVResponse {
     let caller = ic_cdk::caller();
     let user_id = caller.to_string();
     
-    // Check if user exists
     if !UserStorage::exists(&user_id) {
         return CVResponse {
             cv: None,
@@ -395,7 +395,6 @@ pub async fn upload_cv(payload: CreateCVPayload) -> CVResponse {
 
     match CVStorage::store_cv(cv.clone()) {
         Ok(_) => {
-            // Trigger AI analysis asynchronously
             let cv_id = cv.id.clone();
             ic_cdk::spawn(async move {
                 let _ = CVAnalyzer::analyze_cv(cv_id).await;
@@ -413,13 +412,12 @@ pub async fn upload_cv(payload: CreateCVPayload) -> CVResponse {
     }
 }
 
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 #[candid_method(query)]
 pub async fn get_cv(id: String) -> CVResponse {
     let caller = ic_cdk::caller();
     let user_id = caller.to_string();
     
-    // Check if user exists
     if !UserStorage::exists(&user_id) {
         return CVResponse {
             cv: None,
@@ -429,7 +427,6 @@ pub async fn get_cv(id: String) -> CVResponse {
 
     match CVStorage::get_cv(&id) {
         Ok(cv) => {
-            // Verify ownership
             if cv.user_id != user_id {
                 return CVResponse {
                     cv: None,
@@ -448,13 +445,12 @@ pub async fn get_cv(id: String) -> CVResponse {
     }
 }
 
-#[ic_cdk_macros::query]
+#[ic_cdk::query]
 #[candid_method(query)]
 pub async fn get_my_cvs() -> CVListResponse {
     let caller = ic_cdk::caller();
     let user_id = caller.to_string();
     
-    // Check if user exists
     if !UserStorage::exists(&user_id) {
         return CVListResponse {
             cvs: vec![],
@@ -474,13 +470,12 @@ pub async fn get_my_cvs() -> CVListResponse {
     }
 }
 
-#[ic_cdk_macros::update]
+#[ic_cdk::update]
 #[candid_method(update)]
 pub async fn update_cv(payload: UpdateCVPayload) -> CVResponse {
     let caller = ic_cdk::caller();
     let user_id = caller.to_string();
     
-    // Check if user exists
     if !UserStorage::exists(&user_id) {
         return CVResponse {
             cv: None,
@@ -497,7 +492,6 @@ pub async fn update_cv(payload: UpdateCVPayload) -> CVResponse {
                 };
             }
 
-            // Update fields
             cv.title = payload.title;
             cv.content = payload.content;
             cv.updated_at = ic_cdk::api::time();
@@ -506,7 +500,6 @@ pub async fn update_cv(payload: UpdateCVPayload) -> CVResponse {
 
             match CVStorage::update_cv(cv.clone()) {
                 Ok(_) => {
-                    // Trigger new AI analysis
                     let cv_id = cv.id.clone();
                     ic_cdk::spawn(async move {
                         let _ = CVAnalyzer::analyze_cv(cv_id).await;
