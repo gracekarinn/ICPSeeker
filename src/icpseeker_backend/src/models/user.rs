@@ -6,7 +6,7 @@ use ic_stable_structures::{Storable, BoundedStorable};
 
 pub type FixedString = [u8; 32];
 
-fn string_to_fixed(s: &str) -> FixedString {
+pub fn string_to_fixed(s: &str) -> FixedString {
     let mut fixed = [0u8; 32];
     let bytes = s.as_bytes();
     let len = bytes.len().min(32);
@@ -14,13 +14,20 @@ fn string_to_fixed(s: &str) -> FixedString {
     fixed
 }
 
-fn fixed_to_string(fixed: &FixedString) -> String {
-    String::from_utf8(
-        fixed.iter()
-            .take_while(|&&x| x != 0)
-            .copied()
-            .collect()
-    ).unwrap_or_default()
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct UserProfile {
+    pub id: String,
+    pub name: String,
+    pub email: String,
+    pub phone_number: String,
+    pub city: String,
+    pub country: String,
+    pub education_id: Option<String>,
+    pub bank_info_id: Option<String>,
+    pub status: u8,
+    pub profile_completion: u8,
+    pub created_at: u64,
+    pub updated_at: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -37,6 +44,15 @@ pub struct StableUserProfile {
     pub profile_completion: u8,
     pub created_at: u64,
     pub updated_at: u64,
+}
+
+pub fn fixed_to_string(fixed: &FixedString) -> String {
+    String::from_utf8(
+        fixed.iter()
+            .take_while(|&&x| x != 0)
+            .copied()
+            .collect()
+    ).unwrap_or_default()
 }
 
 impl Storable for StableUserProfile {
@@ -74,34 +90,49 @@ impl Storable for StableUserProfile {
     }
 
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        let mut pos = 0;
-        let mut next_fixed_str = || {
+        fn read_fixed_string(bytes: &[u8], start: usize) -> FixedString {
             let mut arr = [0u8; 32];
-            arr.copy_from_slice(&bytes[pos..pos + 32]);
-            pos += 32;
+            arr.copy_from_slice(&bytes[start..start + 32]);
             arr
-        };
+        }
 
-        let id = next_fixed_str();
-        let name = next_fixed_str();
-        let email = next_fixed_str();
-        let phone_number = next_fixed_str();
-        let city = next_fixed_str();
-        let country = next_fixed_str();
+        let mut pos = 0;
+        
+        let id = read_fixed_string(&bytes, pos);
+        pos += 32;
+        
+        let name = read_fixed_string(&bytes, pos);
+        pos += 32;
+        
+        let email = read_fixed_string(&bytes, pos);
+        pos += 32;
+        
+        let phone_number = read_fixed_string(&bytes, pos);
+        pos += 32;
+        
+        let city = read_fixed_string(&bytes, pos);
+        pos += 32;
+        
+        let country = read_fixed_string(&bytes, pos);
+        pos += 32;
 
         let education_id = if bytes[pos] == 1 {
             pos += 1;
-            Some(next_fixed_str())
+            let edu_id = read_fixed_string(&bytes, pos);
+            pos += 32;
+            Some(edu_id)
         } else {
-            pos += 33; 
+            pos += 33;
             None
         };
 
         let bank_info_id = if bytes[pos] == 1 {
             pos += 1;
-            Some(next_fixed_str())
+            let bank_id = read_fixed_string(&bytes, pos);
+            pos += 32;
+            Some(bank_id)
         } else {
-            pos += 33; 
+            pos += 33;
             None
         };
 
@@ -134,4 +165,69 @@ impl Storable for StableUserProfile {
 impl BoundedStorable for StableUserProfile {
     const MAX_SIZE: u32 = (32 * 8) + 2 + 16; 
     const IS_FIXED_SIZE: bool = true;
+}
+
+impl UserProfile {
+    pub fn new(
+        id: String,
+        name: String,
+        email: String,
+        phone_number: String,
+        city: String,
+        country: String,
+    ) -> Self {
+        let timestamp = time();
+        Self {
+            id,
+            name,
+            email,
+            phone_number,
+            city,
+            country,
+            education_id: None,
+            bank_info_id: None,
+            status: 0,
+            profile_completion: 0,
+            created_at: timestamp,
+            updated_at: timestamp,
+        }
+    }
+}
+
+impl From<StableUserProfile> for UserProfile {
+    fn from(profile: StableUserProfile) -> Self {
+        Self {
+            id: fixed_to_string(&profile.id),
+            name: fixed_to_string(&profile.name),
+            email: fixed_to_string(&profile.email),
+            phone_number: fixed_to_string(&profile.phone_number),
+            city: fixed_to_string(&profile.city),
+            country: fixed_to_string(&profile.country),
+            education_id: profile.education_id.map(|id| fixed_to_string(&id)),
+            bank_info_id: profile.bank_info_id.map(|id| fixed_to_string(&id)),
+            status: profile.status,
+            profile_completion: profile.profile_completion,
+            created_at: profile.created_at,
+            updated_at: profile.updated_at,
+        }
+    }
+}
+
+impl From<UserProfile> for StableUserProfile {
+    fn from(profile: UserProfile) -> Self {
+        Self {
+            id: string_to_fixed(&profile.id),
+            name: string_to_fixed(&profile.name),
+            email: string_to_fixed(&profile.email),
+            phone_number: string_to_fixed(&profile.phone_number),
+            city: string_to_fixed(&profile.city),
+            country: string_to_fixed(&profile.country),
+            education_id: profile.education_id.map(|id| string_to_fixed(&id)),
+            bank_info_id: profile.bank_info_id.map(|id| string_to_fixed(&id)),
+            status: profile.status,
+            profile_completion: profile.profile_completion,
+            created_at: profile.created_at,
+            updated_at: profile.updated_at,
+        }
+    }
 }
