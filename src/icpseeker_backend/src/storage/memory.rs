@@ -331,6 +331,19 @@ impl CVStorage {
         })
     }
 
+    pub fn get_latest_version(user_id: &str) -> u32 {
+        let fixed_user_id = string_to_fixed(user_id);
+        CV_STORAGE.with(|storage| {
+            storage
+                .borrow()
+                .iter()
+                .filter(|(_, cv)| cv.user_id == fixed_user_id)
+                .map(|(_, cv)| cv.version)
+                .max()
+                .unwrap_or(0)
+        })
+    }
+
     pub fn update_ai_analysis(
         id: &str, 
         status: CVAnalysisStatus, 
