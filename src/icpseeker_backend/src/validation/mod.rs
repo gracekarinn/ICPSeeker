@@ -1,13 +1,13 @@
-use crate::models::user::UserProfile;
+use crate::models::user::{StableUserProfile, fixed_to_string};
 use crate::storage::memory::{UserStorage, EducationStorage, BankStorage};
 use crate::types::errors::StorageError;
 
 pub struct ValidationService;
 
 impl ValidationService {
-    pub fn validate_user(user: &UserProfile) -> Result<(), StorageError> {
-        if !user.email.contains('@') {
-            return Err(StorageError::ValidationError("Invalid email format".to_string()));
+    pub fn validate_user(user: &StableUserProfile) -> Result<(), StorageError> {
+        if !fixed_to_string(&user.email).contains('@') {
+            return Err(StorageError::ValidationError("Invalid email address".to_string()));
         }
 
         if user.phone_number.len() < 10 {
@@ -18,7 +18,7 @@ impl ValidationService {
             return Err(StorageError::ValidationError("Name is required".to_string()));
         }
 
-        if user.location.city.is_empty() || user.location.country.is_empty() {
+        if user.city.is_empty() || user.country.is_empty() {
             return Err(StorageError::ValidationError("Location fields are required".to_string()));
         }
 
@@ -40,7 +40,6 @@ impl ValidationService {
             }
         }
 
-        // Check bank info reference
         if let Some(bank_id) = &user.bank_info_id {
             if BankStorage::get(bank_id).is_none() {
                 return Err(StorageError::InvalidReference(
