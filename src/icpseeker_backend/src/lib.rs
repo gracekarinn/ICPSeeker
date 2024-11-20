@@ -1,3 +1,8 @@
+use crate::models::cv::{CV, CVAnalysisStatus};
+use crate::storage::cv::CVStorage;
+use candid::candid_method;
+use crate::ai_service::CVAnalyzer;
+use ic_cdk_macros::*;
 use candid::CandidType;
 use serde::{Deserialize, Serialize};
 use ic_stable_structures::{
@@ -110,6 +115,31 @@ pub struct BankInfoPayload {
 pub enum BankResponse {
     Success(BankInformation),
     Error(String),
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub struct CreateCVPayload {
+    pub title: String,
+    pub content: String,
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub struct UpdateCVPayload {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub struct CVResponse {
+    pub cv: Option<CV>,
+    pub message: String,
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub struct CVListResponse {
+    pub cvs: Vec<CV>,
+    pub message: String,
 }
 
 
@@ -337,6 +367,166 @@ pub async fn get_bank_info_by_user_id(user_id: String) -> BankResponse {
     match BankStorage::get_by_user(&user_id) {
         Some(info) => BankResponse::Success(info),
         None => BankResponse::Error("Bank information not found".to_string()),
+    }
+}
+
+#[ic_cdk_macros::update]
+#[candid_method(update)]
+pub async fn upload_cv(payload: CreateCVPayload) -> CVResponse {
+    let caller = ic_cdk::caller();
+    let user_id = caller.to_string();
+    
+    // Check if user exists
+    if !UserStorage::exists(&user_id) {
+        return CVResponse {
+            cv: None,
+            message: "User not found".to_string(),
+        };
+    }
+
+    let next_version = CVStorage::get_latest_version(&user_id) + 1;
+    
+    let cv = CV::new(
+        format!("{}_{}", user_id, next_version),
+        user_id,
+        payload.title,
+        payload.content,
+    );
+
+    match CVStorage::store_cv(cv.clone()) {
+        Ok(_) => {
+            // Trigger AI analysis asynchronously
+            let cv_id = cv.id.clone();
+            ic_cdk::spawn(async move {
+                let _ = CVAnalyzer::analyze_cv(cv_id).await;
+            });
+
+            CVResponse {
+                cv: Some(cv),
+                message: "CV uploaded successfully".to_string(),
+            }
+        }
+        Err(e) => CVResponse {
+            cv: None,
+            message: format!("Failed to store CV: {}", e),
+        },
+    }
+}
+
+#[ic_cdk_macros::query]
+#[candid_method(query)]
+pub async fn get_cv(id: String) -> CVResponse {
+    let caller = ic_cdk::caller();
+    let user_id = caller.to_string();
+    
+    // Check if user exists
+    if !UserStorage::exists(&user_id) {
+        return CVResponse {
+            cv: None,
+            message: "User not found".to_string(),
+        };
+    }
+
+    match CVStorage::get_cv(&id) {
+        Ok(cv) => {
+            // Verify ownership
+            if cv.user_id != user_id {
+                return CVResponse {
+                    cv: None,
+                    message: "Access denied".to_string(),
+                };
+            }
+            CVResponse {
+                cv: Some(cv),
+                message: "CV retrieved successfully".to_string(),
+            }
+        }
+        Err(e) => CVResponse {
+            cv: None,
+            message: format!("Failed to retrieve CV: {}", e),
+        },
+    }
+}
+
+#[ic_cdk_macros::query]
+#[candid_method(query)]
+pub async fn get_my_cvs() -> CVListResponse {
+    let caller = ic_cdk::caller();
+    let user_id = caller.to_string();
+    
+    // Check if user exists
+    if !UserStorage::exists(&user_id) {
+        return CVListResponse {
+            cvs: vec![],
+            message: "User not found".to_string(),
+        };
+    }
+
+    match CVStorage::get_user_cvs(&user_id) {
+        Ok(cvs) => CVListResponse {
+            cvs,
+            message: "CVs retrieved successfully".to_string(),
+        },
+        Err(e) => CVListResponse {
+            cvs: vec![],
+            message: format!("Failed to retrieve CVs: {}", e),
+        },
+    }
+}
+
+#[ic_cdk_macros::update]
+#[candid_method(update)]
+pub async fn update_cv(payload: UpdateCVPayload) -> CVResponse {
+    let caller = ic_cdk::caller();
+    let user_id = caller.to_string();
+    
+    // Check if user exists
+    if !UserStorage::exists(&user_id) {
+        return CVResponse {
+            cv: None,
+            message: "User not found".to_string(),
+        };
+    }
+
+    match CVStorage::get_cv(&payload.id) {
+        Ok(mut cv) => {
+            if cv.user_id != user_id {
+                return CVResponse {
+                    cv: None,
+                    message: "Access denied".to_string(),
+                };
+            }
+
+            // Update fields
+            cv.title = payload.title;
+            cv.content = payload.content;
+            cv.updated_at = ic_cdk::api::time();
+            cv.ai_analysis_status = CVAnalysisStatus::NotAnalyzed;
+            cv.ai_feedback = None;
+
+            match CVStorage::update_cv(cv.clone()) {
+                Ok(_) => {
+                    // Trigger new AI analysis
+                    let cv_id = cv.id.clone();
+                    ic_cdk::spawn(async move {
+                        let _ = CVAnalyzer::analyze_cv(cv_id).await;
+                    });
+
+                    CVResponse {
+                        cv: Some(cv),
+                        message: "CV updated successfully".to_string(),
+                    }
+                }
+                Err(e) => CVResponse {
+                    cv: None,
+                    message: format!("Failed to update CV: {}", e),
+                },
+            }
+        }
+        Err(e) => CVResponse {
+            cv: None,
+            message: format!("Failed to retrieve CV: {}", e),
+        },
     }
 }
 
