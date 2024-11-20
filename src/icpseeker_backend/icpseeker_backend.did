@@ -1,3 +1,168 @@
+type Location = record {
+    city: text;
+    country: text;
+};
+
+type UserStatus = variant {
+    Active;
+    Inactive;
+    Pending;
+    Blocked;
+};
+
+type UserProfile = record {
+    id: text;
+    status: UserStatus;
+    created_at: nat64;
+    updated_at: nat64;
+    name: text;
+    email: text;
+    phone_number: text;
+    location: Location;
+    education_id: opt text;
+    bank_info_id: opt text;
+    profile_completion: nat8;
+};
+
+type CreateUserPayload = record {
+    name: text;
+    email: text;
+    phone_number: text;
+    city: text;
+    country: text;
+};
+
+type UpdateUserPayload = record {
+    name: opt text;
+    email: opt text;
+    phone_number: opt text;
+    city: opt text;
+    country: opt text;
+};
+
+type UserResponse = variant {
+    Success: UserProfile;
+    Error: text;
+};
+
+type EducationLevel = variant {
+    HighSchool;
+    Bachelor;
+    Master;
+    PhD;
+    Other: text;
+};
+
+type EducationStatus = variant {
+    Ongoing;
+    Graduated;
+    Discontinued;
+};
+
+type HighSchoolEducation = record {
+    school_name: text;
+    track: text;
+    city: text;
+    country: text;
+    start_year: nat32;
+    end_year: opt nat32;
+    status: EducationStatus;
+    created_at: nat64;
+    updated_at: nat64;
+};
+
+type UniversityEducation = record {
+    university_name: text;
+    level: EducationLevel;
+    major: text;
+    city: text;
+    country: text;
+    start_year: nat32;
+    end_year: opt nat32;
+    gpa: opt float32;
+    status: EducationStatus;
+    created_at: nat64;
+    updated_at: nat64;
+};
+
+type EducationRecord = record {
+    id: text;
+    user_id: text;
+    high_school: opt HighSchoolEducation;
+    university: vec UniversityEducation;
+    created_at: nat64;
+    updated_at: nat64;
+};
+
+type HighSchoolPayload = record {
+    school_name: text;
+    track: text;
+    city: text;
+    country: text;
+    start_year: nat32;
+    end_year: opt nat32;
+    status: EducationStatus;
+};
+
+type UniversityPayload = record {
+    university_name: text;
+    level: EducationLevel;
+    major: text;
+    city: text;
+    country: text;
+    start_year: nat32;
+    end_year: opt nat32;
+    gpa: opt float32;
+    status: EducationStatus;
+};
+
+type EducationPayload = record {
+    high_school: opt HighSchoolPayload;
+    university: opt vec UniversityPayload;
+};
+
+type EducationResponse = variant {
+    Success: EducationRecord;
+    Error: text;
+};
+
+type BankInformation = record {
+    id: text;
+    user_id: text;
+    account_holder_name: text;
+    bank_name: text;
+    swift_code: text;
+    account_number: text;
+    bank_country: text;
+    bank_branch: opt text;
+    created_at: nat64;
+    updated_at: nat64;
+};
+
+type BankInfoPayload = record {
+    account_holder_name: text;
+    bank_name: text;
+    swift_code: text;
+    account_number: text;
+    bank_country: text;
+    bank_branch: opt text;
+};
+
+type BankResponse = variant {
+    Success: BankInformation;
+    Error: text;
+};
+
 service : {
-    "greet": (text) -> (text) query;
-}
+    create_user: (CreateUserPayload) -> (UserResponse);
+    get_user: () -> (UserResponse) query;
+    get_user_by_id: (text) -> (UserResponse) query;
+    update_user: (UpdateUserPayload) -> (UserResponse);
+    add_education: (EducationPayload) -> (EducationResponse);
+    get_education: () -> (EducationResponse) query;
+    update_education: (EducationPayload) -> (EducationResponse);
+    add_bank_info: (BankInfoPayload) -> (BankResponse);
+    get_bank_info: () -> (BankResponse) query;
+    update_bank_info: (BankInfoPayload) -> (BankResponse);
+    get_bank_info_by_user_id: (text) -> (BankResponse) query;
+};
