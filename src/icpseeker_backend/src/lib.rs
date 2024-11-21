@@ -10,6 +10,8 @@ use ic_stable_structures::{
     DefaultMemoryImpl,
 };
 use std::cell::RefCell;
+use ic_cdk::println;
+use ic_cdk::api::{self, caller}; 
 
 pub mod ai_service;
 mod validation;
@@ -102,7 +104,7 @@ pub enum EducationResponse {
     Error(String),
 }
 
-#[derive(CandidType, Serialize, Deserialize)]
+#[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct BankInfoPayload {
     pub account_holder_name: String,
     pub bank_name: String,
@@ -115,7 +117,7 @@ pub struct BankInfoPayload {
 #[derive(CandidType, Serialize, Deserialize)]
 pub enum BankResponse {
     Success(BankInformation),
-    Error(String),
+    Error(StorageError),
 }
 
 #[derive(CandidType, Serialize, Deserialize)]
@@ -143,10 +145,19 @@ pub struct CVListResponse {
     pub message: String,
 }
 
-
+#[ic_cdk::update]
+#[candid_method(update)]
 pub async fn create_user(payload: CreateUserPayload) -> UserResponse {
-    let caller = ic_cdk::api::caller();
+    let caller = caller();
     let user_id = caller.to_string();
+    
+    if payload.name.trim().is_empty() || 
+       payload.email.trim().is_empty() || 
+       payload.phone_number.trim().is_empty() || 
+       payload.city.trim().is_empty() || 
+       payload.country.trim().is_empty() {
+        return UserResponse::Error("All fields are required".to_string());
+    }
     
     let user = UserProfile::new(
         user_id,
@@ -157,12 +168,15 @@ pub async fn create_user(payload: CreateUserPayload) -> UserResponse {
         payload.country,
     );
 
+    // Attempt to save the user
     match UserStorage::save_with_validation(user.clone()) {
         Ok(()) => UserResponse::Success(user),
         Err(e) => UserResponse::Error(format!("Failed to create user: {:?}", e)),
     }
 }
 
+#[ic_cdk::query]
+#[candid_method(query)]
 pub async fn get_user() -> UserResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -172,7 +186,8 @@ pub async fn get_user() -> UserResponse {
     }
 }
 
-
+#[ic_cdk::query]
+#[candid_method(query)]
 pub async fn get_user_by_id(user_id: String) -> UserResponse {
     let caller = ic_cdk::api::caller().to_string();
 
@@ -183,6 +198,8 @@ pub async fn get_user_by_id(user_id: String) -> UserResponse {
     }
 }
 
+#[ic_cdk::update]
+#[candid_method(update)]
 pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -207,7 +224,6 @@ pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
         user.country = country;
     }
     
-    user.updated_at = ic_cdk::api::time();
 
     match UserStorage::update_with_validation(user.clone()) {
         Ok(()) => UserResponse::Success(user),
@@ -215,6 +231,8 @@ pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
     }
 }
 
+#[ic_cdk::update]
+#[candid_method(update)]
 pub async fn add_education(payload: EducationPayload) -> EducationResponse {
     let user_id = ic_cdk::api::caller().to_string();
     let education_id = format!("EDU_{}", user_id);
@@ -258,6 +276,8 @@ pub async fn add_education(payload: EducationPayload) -> EducationResponse {
     }
 }
 
+#[ic_cdk::query]
+#[candid_method(query)]
 pub async fn get_education() -> EducationResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -267,6 +287,8 @@ pub async fn get_education() -> EducationResponse {
     }
 }
 
+#[ic_cdk::update]
+#[candid_method(update)]
 pub async fn update_education(payload: EducationPayload) -> EducationResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
@@ -312,9 +334,51 @@ pub async fn update_education(payload: EducationPayload) -> EducationResponse {
     }
 }
 
+#[ic_cdk::update]
+#[candid_method(update)]
 pub async fn add_bank_info(payload: BankInfoPayload) -> BankResponse {
+    println!("Starting add_bank_info with payload: {:?}", payload);  // Debug log
+
+    // Validate payload fields
+    if payload.account_holder_name.trim().is_empty() {
+        return BankResponse::Error(StorageError::ValidationError(
+            "Account holder name cannot be empty".to_string()
+        ));
+    }
+
+    if payload.account_number.trim().is_empty() {
+        return BankResponse::Error(StorageError::ValidationError(
+            "Account number cannot be empty".to_string()
+        ));
+    }
+
+    if payload.swift_code.trim().is_empty() {
+        return BankResponse::Error(StorageError::ValidationError(
+            "SWIFT code cannot be empty".to_string()
+        ));
+    }
+
     let user_id = ic_cdk::api::caller().to_string();
+    println!("User ID: {}", user_id);  // Debug log
+
+    // Check if user exists
+    if !UserStorage::exists(&user_id) {
+        println!("User not found: {}", user_id);  // Debug log
+        return BankResponse::Error(StorageError::InvalidReference(
+            "User does not exist".to_string()
+        ));
+    }
+
     let bank_id = format!("BANK_{}", user_id);
+    println!("Generated bank_id: {}", bank_id);  // Debug log
+
+    // Check if bank info already exists
+    if let Some(_existing) = BankStorage::get_by_user(&user_id) {
+        println!("Bank info already exists for user: {}", user_id);  // Debug log
+        return BankResponse::Error(StorageError::AlreadyExists(
+            "Bank information already exists for this user".to_string()
+        ));
+    }
 
     let bank_info = BankInformation::new(
         bank_id.clone(),
@@ -327,27 +391,43 @@ pub async fn add_bank_info(payload: BankInfoPayload) -> BankResponse {
         payload.bank_branch,
     );
 
+    println!("Created bank_info object: {:?}", bank_info);  // Debug log
+
     match BankStorage::save_with_validation(bank_info.clone()) {
-        Ok(()) => BankResponse::Success(bank_info),
-        Err(e) => BankResponse::Error(format!("Failed to update bank information: {:?}", e)),
+        Ok(()) => {
+            println!("Successfully saved bank info");  // Debug log
+            BankResponse::Success(bank_info)
+        },
+        Err(e) => {
+            println!("Error saving bank info: {:?}", e);  // Debug log
+            BankResponse::Error(e)
+        }
     }
 }
 
+#[ic_cdk::query]
+#[candid_method(query)]
 pub async fn get_bank_info() -> BankResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
     match BankStorage::get_by_user(&user_id) {
         Some(info) => BankResponse::Success(info),
-        None => BankResponse::Error("Bank information not found".to_string()),
+        None => BankResponse::Error(StorageError::NotFound(
+            "Bank information not found".to_string()
+        )),
     }
 }
 
+#[ic_cdk::update]
+#[candid_method(update)]
 pub async fn update_bank_info(payload: BankInfoPayload) -> BankResponse {
     let user_id = ic_cdk::api::caller().to_string();
     
     let mut bank_info = match BankStorage::get_by_user(&user_id) {
         Some(info) => info,
-        None => return BankResponse::Error("Bank information not found".to_string()),
+        None => return BankResponse::Error(StorageError::NotFound(
+            "Bank information not found".to_string()
+        )),
     };
 
     bank_info.account_holder_name = payload.account_holder_name;
@@ -360,14 +440,18 @@ pub async fn update_bank_info(payload: BankInfoPayload) -> BankResponse {
 
     match BankStorage::update_with_validation(bank_info.clone()) {
         Ok(()) => BankResponse::Success(bank_info),
-        Err(e) => BankResponse::Error(format!("Failed to update bank information: {:?}", e)),
+        Err(e) => BankResponse::Error(e), 
     }
 }
 
+#[ic_cdk::query]
+#[candid_method(query)]
 pub async fn get_bank_info_by_user_id(user_id: String) -> BankResponse {
     match BankStorage::get_by_user(&user_id) {
         Some(info) => BankResponse::Success(info),
-        None => BankResponse::Error("Bank information not found".to_string()),
+        None => BankResponse::Error(StorageError::NotFound(
+            "Bank information not found".to_string()
+        )),
     }
 }
 
