@@ -1,2 +1,2 @@
-mod analyzer;
-pub use analyzer::CVAnalyzer;
+pub mod analyzer;
+pub use analyzer::{analyze_cv, CVAnalysisResult};
