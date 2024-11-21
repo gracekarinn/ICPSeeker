@@ -16,8 +16,6 @@ type UserProfile = record {
     bank_info_id: opt text;
     status: nat8; // 0: Active, 1: Inactive, etc.
     profile_completion: nat8;
-    created_at: nat64;
-    updated_at: nat64;
 };
 
 type CreateUserPayload = record {
