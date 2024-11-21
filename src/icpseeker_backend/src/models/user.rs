@@ -26,8 +26,6 @@ pub struct UserProfile {
     pub bank_info_id: Option<String>,
     pub status: u8,
     pub profile_completion: u8,
-    pub created_at: u64,
-    pub updated_at: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -42,8 +40,6 @@ pub struct StableUserProfile {
     pub bank_info_id: Option<FixedString>,
     pub status: u8,
     pub profile_completion: u8,
-    pub created_at: u64,
-    pub updated_at: u64,
 }
 
 pub fn fixed_to_string(fixed: &FixedString) -> String {
@@ -83,8 +79,6 @@ impl Storable for StableUserProfile {
 
         bytes.push(self.status);
         bytes.push(self.profile_completion);
-        bytes.extend_from_slice(&self.created_at.to_be_bytes());
-        bytes.extend_from_slice(&self.updated_at.to_be_bytes());
         
         Cow::Owned(bytes)
     }
@@ -141,10 +135,6 @@ impl Storable for StableUserProfile {
         let profile_completion = bytes[pos];
         pos += 1;
 
-        let created_at = u64::from_be_bytes(bytes[pos..pos + 8].try_into().unwrap());
-        pos += 8;
-        let updated_at = u64::from_be_bytes(bytes[pos..pos + 8].try_into().unwrap());
-
         Self {
             id,
             name,
@@ -156,8 +146,6 @@ impl Storable for StableUserProfile {
             bank_info_id,
             status,
             profile_completion,
-            created_at,
-            updated_at,
         }
     }
 }
@@ -188,8 +176,6 @@ impl UserProfile {
             bank_info_id: None,
             status: 0,
             profile_completion: 0,
-            created_at: timestamp,
-            updated_at: timestamp,
         }
     }
 }
@@ -207,8 +193,6 @@ impl From<StableUserProfile> for UserProfile {
             bank_info_id: profile.bank_info_id.map(|id| fixed_to_string(&id)),
             status: profile.status,
             profile_completion: profile.profile_completion,
-            created_at: profile.created_at,
-            updated_at: profile.updated_at,
         }
     }
 }
@@ -226,8 +210,6 @@ impl From<UserProfile> for StableUserProfile {
             bank_info_id: profile.bank_info_id.map(|id| string_to_fixed(&id)),
             status: profile.status,
             profile_completion: profile.profile_completion,
-            created_at: profile.created_at,
-            updated_at: profile.updated_at,
         }
     }
 }
