@@ -1,17 +1,17 @@
 use crate::validation::ValidationService;
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
-use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap, Storable};
+use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap};
 use std::cell::RefCell;
-use std::collections::HashMap;
-
 use crate::models::{
     UserProfile,
-    user::{StableUserProfile, string_to_fixed, fixed_to_string, FixedString},
+    user::{StableUserProfile},
     education::{EducationRecord, StableEducationRecord},
     bank::{BankInformation, StableBankInformation},
     cv::{CV, StableCV, CVAnalysisStatus},
 };
 use crate::types::errors::StorageError;
+use crate::models::types::{StorageKey, string_to_storage_key, storage_key_to_string, string_to_content, string_to_fixed};
+
 
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
@@ -25,25 +25,26 @@ thread_local! {
         MemoryManager::init(DefaultMemoryImpl::default())
     );
 
-    static USERS: RefCell<StableBTreeMap<FixedString, StableUserProfile, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
+    static USERS: RefCell<StableBTreeMap<StorageKey, StableUserProfile, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_USERS))
         )
     );
 
-    static EDUCATION_RECORDS: RefCell<StableBTreeMap<FixedString, StableEducationRecord, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
-        StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_EDUCATION))
-        )
-    );
-
-    static BANK_INFO: RefCell<StableBTreeMap<FixedString, StableBankInformation, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
+    static BANK_INFO: RefCell<StableBTreeMap<StorageKey, StableBankInformation, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_BANK))
         )
     );
 
-    static CV_STORAGE: RefCell<StableBTreeMap<FixedString, StableCV, CVMemory>> = RefCell::new(
+
+    static EDUCATION_RECORDS: RefCell<StableBTreeMap<StorageKey, StableEducationRecord, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_EDUCATION))
+        )
+    );
+
+    static CV_STORAGE: RefCell<StableBTreeMap<StorageKey, StableCV, CVMemory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(CV_MEM_ID))
         )
@@ -53,63 +54,74 @@ thread_local! {
 pub struct UserStorage;
 
 impl UserStorage {
-    pub fn save(user: UserProfile) -> Result<(), String> {
-        let stable_user: StableUserProfile = user.into();
-        USERS.with(|users| {
-            users.borrow_mut().insert(stable_user.id, stable_user);
-            Ok(())
-        })
-    }
-
     pub fn exists(id: &str) -> bool {
-        let fixed_id = string_to_fixed(id);
-        USERS.with(|users| {
-            users.borrow().contains_key(&fixed_id)
-        })
+        let key = string_to_storage_key(id);
+        USERS.with(|users| users.borrow().contains_key(&key))
     }
 
     pub fn get(id: &str) -> Option<UserProfile> {
-        let fixed_id = string_to_fixed(id);
+        let key = string_to_storage_key(id);
         USERS.with(|users| {
-            users.borrow().get(&fixed_id)
+            users.borrow().get(&key)
                 .map(|stable_user| stable_user.into())
         })
     }
 
-    pub fn update(user: UserProfile) -> Result<(), String> {
-        let stable_user: StableUserProfile = user.into();
+     pub fn save_with_validation(user: UserProfile) -> Result<(), StorageError> {
+        // Input validation
+        if user.name.trim().is_empty() {
+            return Err(StorageError::ValidationError("Name cannot be empty".to_string()));
+        }
+        if user.email.trim().is_empty() {
+            return Err(StorageError::ValidationError("Email cannot be empty".to_string()));
+        }
+        if user.phone_number.trim().is_empty() {
+            return Err(StorageError::ValidationError("Phone number cannot be empty".to_string()));
+        }
+        if user.city.trim().is_empty() {
+            return Err(StorageError::ValidationError("City cannot be empty".to_string()));
+        }
+        if user.country.trim().is_empty() {
+            return Err(StorageError::ValidationError("Country cannot be empty".to_string()));
+        }
+
+        let key = string_to_storage_key(&user.id);
+        
+        // Check if user already exists
+        if USERS.with(|users| users.borrow().contains_key(&key)) {
+            return Err(StorageError::AlreadyExists("User already exists".to_string()));
+        }
+        
+        let stable_user = StableUserProfile::from(user);
+        
         USERS.with(|users| {
-            if users.borrow().contains_key(&stable_user.id) {
-                users.borrow_mut().insert(stable_user.id, stable_user);
-                Ok(())
-            } else {
-                Err("User not found".to_string())
-            }
+            users.borrow_mut().insert(key, stable_user);
+            Ok(())
         })
     }
 
-    pub fn save_with_validation(user: UserProfile) -> Result<(), StorageError> {
-        let stable_user: StableUserProfile = user.clone().into();
-        ValidationService::validate_user(&stable_user)
-            .map_err(|e| StorageError::ValidationError(format!("{:?}", e)))?;
-
-        Self::save(user).map_err(|e| StorageError::SystemError(e))
-    }
-
     pub fn update_with_validation(user: UserProfile) -> Result<(), StorageError> {
-        let stable_user: StableUserProfile = user.clone().into();
-        ValidationService::validate_user(&stable_user)
-            .map_err(|e| StorageError::ValidationError(format!("{:?}", e)))?;
-
-        ValidationService::validate_relationships(&user.id)?;
-
-        Self::update(user).map_err(|e| StorageError::SystemError(e))
+        let key = string_to_storage_key(&user.id);
+        let stable_user = StableUserProfile::from(user.clone());
+        
+        USERS.with(|users| {
+            if !users.borrow().contains_key(&key) {
+                return Err(StorageError::NotFound("User not found".to_string()));
+            }
+            users.borrow_mut().insert(key, stable_user);
+            Ok(())
+        })
     }
 }
 
 pub struct EducationStorage;
 
 impl EducationStorage {
+    pub fn exists(id: &str) -> bool {
+        let key = string_to_storage_key(id);
+        BANK_INFO.with(|info| info.borrow().contains_key(&key))
+    }
+
     pub fn save(record: EducationRecord) -> Result<(), String> {
         let stable_record: StableEducationRecord = record.into();
         EDUCATION_RECORDS.with(|records| {
@@ -119,19 +131,32 @@ impl EducationStorage {
     }
 
     pub fn get(id: &str) -> Option<EducationRecord> {
-        let fixed_id = string_to_fixed(id);
+        let key = string_to_storage_key(id);
         EDUCATION_RECORDS.with(|records| {
-            records.borrow().get(&fixed_id)
+            records.borrow().get(&key)
                 .map(|stable_record| stable_record.into())
         })
     }
 
-    pub fn get_by_user(user_id: &str) -> Option<EducationRecord> {
-        let fixed_user_id = string_to_fixed(user_id);
-        EDUCATION_RECORDS.with(|records| {
-            records.borrow().iter()
-                .find(|(_, record)| record.user_id == fixed_user_id)
+    pub fn get_by_user(user_id: &str) -> Option<EducationRecord> { // Changed return type
+        let user_key = string_to_storage_key(user_id);
+        EDUCATION_RECORDS.with(|storage| {
+            storage.borrow().iter()
+                .find(|(_, record)| record.user_id == user_key)
                 .map(|(_, record)| record.into())
+        })
+    }
+
+    pub fn update_with_validation(record: EducationRecord) -> Result<(), StorageError> {
+        let key = string_to_storage_key(&record.id);
+        if !EDUCATION_RECORDS.with(|records| records.borrow().contains_key(&key)) {
+            return Err(StorageError::NotFound("Education record not found".to_string()));
+        }
+    
+        let stable_record = StableEducationRecord::from(record);
+        EDUCATION_RECORDS.with(|records| {
+            records.borrow_mut().insert(key, stable_record);
+            Ok(())
         })
     }
 
@@ -144,19 +169,6 @@ impl EducationStorage {
             } else {
                 Err("Education record not found".to_string())
             }
-        })
-    }
-
-    pub fn update_with_validation(record: EducationRecord) -> Result<(), StorageError> {
-        let fixed_id = string_to_fixed(&record.id);
-        if !EDUCATION_RECORDS.with(|records| records.borrow().contains_key(&fixed_id)) {
-            return Err(StorageError::NotFound("Education record not found".to_string()));
-        }
-    
-        let stable_record: StableEducationRecord = record.into();
-        EDUCATION_RECORDS.with(|records| {
-            records.borrow_mut().insert(stable_record.id, stable_record);
-            Ok(())
         })
     }
 
@@ -193,18 +205,19 @@ impl BankStorage {
     }
 
     pub fn get(id: &str) -> Option<BankInformation> {
-        let fixed_id = string_to_fixed(id);
-        BANK_INFO.with(|bank_info| {
-            bank_info.borrow().get(&fixed_id)
+        let key = string_to_storage_key(id);
+        BANK_INFO.with(|storage| {
+            storage.borrow().get(&key)
                 .map(|stable_info| stable_info.into())
         })
     }
 
+
     pub fn get_by_user(user_id: &str) -> Option<BankInformation> {
-        let fixed_user_id = string_to_fixed(user_id);
-        BANK_INFO.with(|bank_info| {
-            bank_info.borrow().iter()
-                .find(|(_, info)| info.user_id == fixed_user_id)
+        let user_key = string_to_storage_key(user_id);
+        BANK_INFO.with(|storage| {
+            storage.borrow().iter()
+                .find(|(_, info)| info.user_id == user_key)
                 .map(|(_, info)| info.into())
         })
     }
@@ -222,27 +235,50 @@ impl BankStorage {
     }
 
     pub fn save_with_validation(info: BankInformation) -> Result<(), StorageError> {
+        println!("Starting save_with_validation");  // Debug log
+
+        // Validate user exists
         if UserStorage::get(&info.user_id).is_none() {
+            println!("User not found in save_with_validation");  // Debug log
             return Err(StorageError::InvalidReference(
                 "User does not exist".to_string()
             ));
         }
 
-        if let Some(existing) = Self::get_by_user(&info.user_id) {
-            if existing.id != info.id {
-                return Err(StorageError::AlreadyExists(
-                    "User already has bank information".to_string()
-                ));
-            }
-        }
-
+        // Validate SWIFT code
         if !Self::is_valid_swift(&info.swift_code) {
+            println!("Invalid SWIFT code");  // Debug log
             return Err(StorageError::ValidationError(
                 "Invalid SWIFT code format".to_string()
             ));
         }
 
-        Self::save(info).map_err(|e| StorageError::SystemError(e))
+        // Check for existing bank info
+        if let Some(_) = Self::get_by_user(&info.user_id) {
+            println!("Bank info already exists");  // Debug log
+            return Err(StorageError::AlreadyExists(
+                "Bank information already exists for this user".to_string()
+            ));
+        }
+
+        println!("Converting to stable storage format");  // Debug log
+        let stable_info: StableBankInformation = info.clone().into();
+        let key = string_to_storage_key(&info.id);
+        
+        BANK_INFO.with(|storage| {
+            storage.borrow_mut().insert(key, stable_info);
+            Ok(())
+        })
+    }
+
+    pub fn is_valid_swift(code: &str) -> bool {
+        let code = code.trim();
+        if code.len() != 8 && code.len() != 11 {
+            println!("Invalid SWIFT code length: {}", code.len());  // Debug log
+            return false;
+        }
+        // Basic SWIFT code format validation
+        code.chars().all(|c| c.is_ascii_alphanumeric())
     }
 
     pub fn update_with_validation(info: BankInformation) -> Result<(), StorageError> {
@@ -260,33 +296,29 @@ impl BankStorage {
         let stable_info: StableBankInformation = info.into();
         BANK_INFO.with(|bank_info| {
             bank_info.borrow_mut().insert(stable_info.id, stable_info);
-            Ok(())
+            Ok(()) 
         })
     }
 
-    pub fn is_valid_swift(code: &str) -> bool {
-        let code_len = code.len();
-        code_len == 8 || code_len == 11
-    }
 }
 
 pub struct CVStorage;
 
 impl CVStorage {
     pub fn store_cv(cv: CV) -> Result<(), StorageError> {
-        let stable_cv = StableCV::from(cv);
+        let stable_cv = StableCV::from(cv.clone());
+        let key = string_to_storage_key(&cv.id);
+        
         CV_STORAGE.with(|storage| {
-            storage.borrow_mut().insert(stable_cv.id, stable_cv);
+            storage.borrow_mut().insert(key, stable_cv);
             Ok(())
         })
     }
 
     pub fn get_cv(id: &str) -> Result<CV, StorageError> {
-        let fixed_id = string_to_fixed(id);
+        let key = string_to_storage_key(id);
         CV_STORAGE.with(|storage| {
-            storage
-                .borrow()
-                .get(&fixed_id)
+            storage.borrow().get(&key)
                 .map(|cv| CV::from(cv))
                 .ok_or_else(|| StorageError::NotFound("CV not found".to_string()))
         })
@@ -365,6 +397,35 @@ impl CVStorage {
             } else {
                 Err(StorageError::NotFound("CV not found".to_string()))
             }
+        })
+    }
+
+    pub fn save_with_validation(cv: CV) -> Result<(), StorageError> {
+        // Validate string lengths
+        if cv.title.len() > 64 {
+            return Err(StorageError::ValidationError(
+                "Title is too long (max 64 bytes)".to_string()
+            ));
+        }
+
+        if cv.content.len() > 1024 {
+            return Err(StorageError::ValidationError(
+                "Content is too long (max 1024 bytes)".to_string()
+            ));
+        }
+
+        if let Some(feedback) = &cv.ai_feedback {
+            if feedback.len() > 1024 {
+                return Err(StorageError::ValidationError(
+                    "AI feedback is too long (max 1024 bytes)".to_string()
+                ));
+            }
+        }
+
+        let stable_cv: StableCV = cv.into();
+        CV_STORAGE.with(|storage| {
+            storage.borrow_mut().insert(stable_cv.id, stable_cv);
+            Ok(()) 
         })
     }
 }
