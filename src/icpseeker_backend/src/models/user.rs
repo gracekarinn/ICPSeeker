@@ -164,7 +164,6 @@ impl UserProfile {
         city: String,
         country: String,
     ) -> Self {
-        let timestamp = time();
         Self {
             id,
             name,
