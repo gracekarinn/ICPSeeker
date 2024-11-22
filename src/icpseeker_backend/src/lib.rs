@@ -1,7 +1,6 @@
 use crate::models::cv::{CV, CVAnalysisStatus};
 use crate::storage::CVStorage;
-use candid::candid_method;
-use crate::ai_service::CVAnalyzer;
+use candid::{candid_method, Principal};
 use ic_cdk_macros::{query, update};
 use candid::CandidType;
 use serde::{Deserialize, Serialize};
@@ -12,8 +11,18 @@ use ic_stable_structures::{
 use std::cell::RefCell;
 use ic_cdk::println;
 use ic_cdk::api::{self, caller}; 
+use crate::models::chat::{ChatResponse, ChatHistoryResponse};
+use crate::services::chat::ChatService;
+use crate::ai_service::analyzer;
+pub use crate::ai_service::analyzer::CVAnalyzer;
+use ic_cdk::api::management_canister::http_request::{ http_request, CanisterHttpRequestArgument, HttpMethod, TransformContext, HttpHeader, HttpResponse, TransformArgs };
+
 
 pub mod ai_service;
+pub mod services {
+    pub mod chat;
+    pub mod ai; 
+}
 mod validation;
 mod models;
 mod storage;
@@ -35,13 +44,23 @@ thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = RefCell::new(
         MemoryManager::init(DefaultMemoryImpl::default())
     );
+    static OPENAI_API_KEY: RefCell<String> = RefCell::new(String::new());
+    static CONTROLLER: RefCell<Principal> = RefCell::new(Principal::anonymous());
 }
 
+#[ic_cdk::init]
 fn init() {
+    let caller = ic_cdk::caller();
+    
     MEMORY_MANAGER.with(|m| {
         let _ = m.borrow_mut();
     });
+
+    CONTROLLER.with(|c| {
+        *c.borrow_mut() = caller;
+    });
 }
+
 
 
 #[derive(CandidType, Serialize, Deserialize)]
@@ -143,6 +162,11 @@ pub struct CVResponse {
 pub struct CVListResponse {
     pub cvs: Vec<CV>,
     pub message: String,
+}
+
+#[ic_cdk::query]
+fn transform_response(args: TransformArgs) -> HttpResponse {
+    args.response
 }
 
 #[ic_cdk::update]
@@ -605,6 +629,58 @@ pub async fn update_cv(payload: UpdateCVPayload) -> CVResponse {
             message: format!("Failed to retrieve CV: {}", e),
         },
     }
+}
+
+#[ic_cdk::update]
+#[candid_method(update)]
+pub async fn start_cv_chat(cv_id: String) -> ChatResponse {
+    let caller = ic_cdk::caller().to_string();
+    ChatService::start_chat(&caller, &cv_id).await
+}
+
+#[ic_cdk::update]
+#[candid_method(update)]
+pub async fn send_chat_message(session_id: String, content: String) -> ChatResponse {
+    let caller = ic_cdk::caller().to_string();
+    ChatService::send_message(&session_id, &caller, content).await
+}
+
+#[ic_cdk::query]
+#[candid_method(query)]
+pub fn get_chat_history(session_id: String) -> ChatHistoryResponse {
+    let caller = ic_cdk::caller().to_string();
+    ChatService::get_chat_history(&session_id, &caller)
+}
+
+#[ic_cdk::update]
+#[candid_method(update)]
+fn set_openai_key(key: String) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    
+    let is_controller = CONTROLLER.with(|c| {
+        c.borrow().to_string() == caller.to_string()
+    });
+
+    if !is_controller {
+        return Err("Unauthorized: Only controller can set API key".to_string());
+    }
+
+    OPENAI_API_KEY.with(|k| {
+        *k.borrow_mut() = key;
+    });
+    
+    Ok(())
+}
+
+pub fn get_openai_key() -> Result<String, String> {
+    OPENAI_API_KEY.with(|k| {
+        let key = k.borrow().clone();
+        if key.is_empty() {
+            Err("OpenAI API key not set".to_string())
+        } else {
+            Ok(key)
+        }
+    })
 }
 
 ic_cdk::export_candid!();
