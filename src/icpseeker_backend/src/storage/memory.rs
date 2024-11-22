@@ -8,10 +8,14 @@ use crate::models::{
     education::{EducationRecord, StableEducationRecord},
     bank::{BankInformation, StableBankInformation},
     cv::{CV, StableCV, CVAnalysisStatus},
+    chat::{ChatMessage, StableChatMessage, ChatSession, StableChatSession},
+    FixedString, StorageKey
 };
-use crate::types::errors::StorageError;
-use crate::models::types::{StorageKey, string_to_storage_key, storage_key_to_string, string_to_content, string_to_fixed};
-
+use crate::models::rate_limit::{UserAPIUsage, StableUserAPIUsage};
+use crate::types::errors::{StorageError, ChatStorageError};
+use crate::models::types::{string_to_storage_key, storage_key_to_string, string_to_content, string_to_fixed};
+use ic_cdk::api::time;
+use crate::models::RateLimitConfig;
 
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
@@ -36,8 +40,6 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_BANK))
         )
     );
-
-
     static EDUCATION_RECORDS: RefCell<StableBTreeMap<StorageKey, StableEducationRecord, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_EDUCATION))
@@ -49,6 +51,19 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(CV_MEM_ID))
         )
     );
+
+    static API_USAGE_STORAGE: RefCell<StableBTreeMap<FixedString, StableUserAPIUsage, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
+        StableBTreeMap::new(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3))))
+    );
+
+    static CHAT_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatMessage, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
+        StableBTreeMap::new(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4))))
+    );
+
+    static CHAT_SESSION_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatSession, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
+        StableBTreeMap::new(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))))
+    );
+
 }
 
 pub struct UserStorage;
@@ -401,7 +416,6 @@ impl CVStorage {
     }
 
     pub fn save_with_validation(cv: CV) -> Result<(), StorageError> {
-        // Validate string lengths
         if cv.title.len() > 64 {
             return Err(StorageError::ValidationError(
                 "Title is too long (max 64 bytes)".to_string()
@@ -435,4 +449,214 @@ pub fn clear_cv_storage() {
     CV_STORAGE.with(|storage| {
         storage.borrow_mut().clear();
     });
+}
+
+pub struct APIUsageStorage;
+
+impl APIUsageStorage {
+    fn get_config() -> RateLimitConfig {
+        RateLimitConfig::default()
+    }
+
+    pub fn check_and_update_limit(user_id: &str) -> Result<bool, String> {
+        let config = Self::get_config();
+        let mut usage = Self::get_usage(user_id).unwrap_or(UserAPIUsage {
+            user_id: user_id.to_string(),
+            daily_requests: 0,
+            last_reset: time(),
+            total_requests: 0,
+        });
+
+        let current_time = time();
+        
+        if current_time - usage.last_reset >= config.reset_interval_nanos {
+            usage.daily_requests = 0;
+            usage.last_reset = current_time;
+        }
+
+        if usage.daily_requests >= config.daily_limit {
+            return Ok(false);
+        }
+
+        usage.daily_requests += 1;
+        usage.total_requests += 1;
+
+        Self::update_usage(usage)?;
+
+        Ok(true)
+    }
+
+    pub fn get_usage(user_id: &str) -> Result<UserAPIUsage, String> {
+        let fixed_id = string_to_fixed(user_id);
+        API_USAGE_STORAGE.with(|storage| {
+            storage
+                .borrow()
+                .get(&fixed_id)
+                .map(|usage| usage.into())
+                .ok_or_else(|| "API usage not found".to_string())
+        })
+    }
+
+    pub fn update_usage(usage: UserAPIUsage) -> Result<(), String> {
+        let stable_usage: StableUserAPIUsage = usage.into();
+        let fixed_id = stable_usage.user_id;
+        API_USAGE_STORAGE.with(|storage| {
+            storage.borrow_mut().insert(fixed_id, stable_usage);
+            Ok(())
+        })
+    }
+
+}
+
+pub struct ChatStorage;
+
+impl ChatStorage {
+    pub fn store_message(message: ChatMessage) -> Result<(), String> {
+        let msg_id = message.id.clone();
+        let stable_message: StableChatMessage = message.into();
+        let fixed_id = string_to_fixed(&msg_id);
+
+        CHAT_STORAGE.with(|storage| {
+            match storage.borrow_mut().insert(fixed_id, stable_message) {
+                Some(_) | None => Ok(()),
+            }
+        })
+    }
+
+    pub fn get_message(id: &str) -> Result<ChatMessage, String> {
+        let fixed_id = string_to_fixed(id);
+
+        CHAT_STORAGE.with(|storage| {
+            storage
+                .borrow()
+                .get(&fixed_id)
+                .map(|msg| msg.into())
+                .ok_or_else(|| "Chat message not found".to_string())
+        })
+    }
+
+    pub fn delete_message(id: &str) -> Result<(), String> {
+        let fixed_id = string_to_fixed(id);
+
+        CHAT_STORAGE.with(|storage| {
+            storage
+                .borrow_mut()
+                .remove(&fixed_id)
+                .map(|_| ())
+                .ok_or_else(|| "Chat message not found".to_string())
+        })
+    }
+
+    pub fn get_session_messages(session_id: &str) -> Result<Vec<ChatMessage>, String> {
+        let prefix = string_to_fixed(session_id);
+        
+        CHAT_STORAGE.with(|storage| {
+            let messages: Vec<ChatMessage> = storage
+                .borrow()
+                .iter()
+                .filter(|(key, _)| key.starts_with(&prefix[..session_id.len().min(32)]))
+                .map(|(_, value)| value.into())
+                .collect();
+
+            if messages.is_empty() {
+                Err("No messages found for session".to_string())
+            } else {
+                Ok(messages)
+            }
+        })
+    }
+
+    pub fn cleanup_old_messages(older_than_nanos: u64) -> Result<u32, String> {
+        let current_time = ic_cdk::api::time();
+        let mut deleted_count = 0;
+
+        CHAT_STORAGE.with(|storage| {
+            let to_delete: Vec<FixedString> = storage
+                .borrow()
+                .iter()
+                .filter(|(_, msg)| (current_time - msg.timestamp) > older_than_nanos)
+                .map(|(key, _)| key)
+                .collect();
+
+            for key in to_delete {
+                if storage.borrow_mut().remove(&key).is_some() {
+                    deleted_count += 1;
+                }
+            }
+        });
+
+        Ok(deleted_count)
+    }
+}
+
+pub struct ChatSessionStorage;
+
+impl ChatSessionStorage {
+    pub fn create_session(user_id: &str, cv_id: &str) -> Result<ChatSession, ChatStorageError> {
+        let session = ChatSession::new(user_id.to_string(), cv_id.to_string());
+        let stable_session: StableChatSession = session.clone().into();
+        let fixed_id = string_to_fixed(&session.id);
+    
+        CHAT_SESSION_STORAGE.with(|storage| {
+            storage.borrow_mut().insert(fixed_id, stable_session);
+            Ok(session)
+        })
+    }
+    
+    pub fn update_session(session: ChatSession) -> Result<(), ChatStorageError> {
+        let stable_session: StableChatSession = session.into();
+        let fixed_id = stable_session.id;
+    
+        CHAT_SESSION_STORAGE.with(|storage| {
+            storage.borrow_mut().insert(fixed_id, stable_session);
+            Ok(())
+        })
+    }
+
+    pub fn get_session(session_id: &str) -> Result<ChatSession, ChatStorageError> {
+        let fixed_id = string_to_fixed(session_id);
+
+        CHAT_SESSION_STORAGE.with(|storage| {
+            storage
+                .borrow()
+                .get(&fixed_id)
+                .map(|session| session.into())
+                .ok_or(ChatStorageError::NotFound)
+        })
+    }
+
+    pub fn get_user_sessions(user_id: &str) -> Vec<ChatSession> {
+        let fixed_user_id = string_to_fixed(user_id);
+
+        CHAT_SESSION_STORAGE.with(|storage| {
+            storage
+                .borrow()
+                .iter()
+                .filter(|(_, session)| session.user_id == fixed_user_id)
+                .map(|(_, session)| session.into())
+                .collect()
+        })
+    }
+
+    pub fn delete_old_sessions(older_than_nanos: u64) -> u32 {
+        let current_time = time();
+        let mut deleted_count = 0;
+
+        CHAT_SESSION_STORAGE.with(|storage| {
+            let to_delete: Vec<FixedString> = storage
+                .borrow()
+                .iter()
+                .filter(|(_, session)| (current_time - session.last_interaction) > older_than_nanos)
+                .map(|(key, _)| key)
+                .collect();
+
+            for key in to_delete {
+                if storage.borrow_mut().remove(&key).is_some() {
+                    deleted_count += 1;
+                }
+            }
+        });
+
+        deleted_count
+    }
 }
