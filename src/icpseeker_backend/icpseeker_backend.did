@@ -193,6 +193,7 @@ type CVListResponse = record {
     message: text;
 };
 
+type Result = variant { ok : null; err : text };
 
 service : {
     create_user: (CreateUserPayload) -> (UserResponse);
@@ -210,4 +211,5 @@ service : {
     "get_cv": (text) -> (CVResponse) query;
     "get_my_cvs": () -> (CVListResponse) query;
     "update_cv": (UpdateCVPayload) -> (CVResponse);
+    set_openai_key: (text) -> (Result);
 };
