@@ -4,17 +4,15 @@ use ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse,
     TransformArgs, TransformContext, TransformFunc,
 };
-use crate::services::ai::OpenAIMessage;
+use crate::services::ai::{
+    OpenAIMessage, OpenAIResponse, OpenAIRequest, OPENAI_API_URL, OPENAI_MODEL, AIConfig
+};
 use ic_cdk::api::time;
 use serde_json::json;
-use crate::services::ai::OPENAI_API_URL;
-use crate::services::ai::OpenAIResponse;
-use crate::services::ai::OpenAIRequest;
-use crate::services::ai::OPENAI_MODEL;
-use crate::services::ai::AIConfig;
 use candid::Func;
 use ic_cdk::api::call::CallResult;
 use candid::Principal;
+use candid::Nat;
 
 pub struct AIService;
 
@@ -55,11 +53,9 @@ impl AIService {
 
         let response = Self::call_openai(request).await?;
 
-        if let Some(choice) = response.choices.first() {
-            Ok(choice.message.content.clone())
-        } else {
-            Err("No response generated".to_string())
-        }
+        response.choices.first()
+            .map(|choice| choice.message.content.clone())
+            .ok_or_else(|| "No response generated".to_string())
     }
 
     fn create_system_message(cv: &CV) -> String {
@@ -93,51 +89,64 @@ impl AIService {
         let request_body = serde_json::to_string(&request)
             .map_err(|e| format!("Failed to serialize request: {}", e))?;
     
-        let transform_func = TransformFunc(Func {
-            method: "transform_response".to_string(),
-            principal: ic_cdk::id(),
-        });
-    
         let request = CanisterHttpRequestArgument {
             url: OPENAI_API_URL.to_string(),
             method: HttpMethod::POST,
             body: Some(request_body.into_bytes()),
             max_response_bytes: Some(2048),
             transform: Some(TransformContext {
-                function: transform_func,
+                function: TransformFunc(Func {
+                    method: "transform_response_query".to_string(),
+                    principal: ic_cdk::id(),
+                }),
                 context: vec![],
             }),
             headers: request_headers,
         };
     
-
         match http_request(request, 0).await {
             Ok((response,)) => {
-                if response.status.to_string() != "200" {
-                    return Err(format!("API error: {}", String::from_utf8_lossy(&response.body)));
+                let status = response.status.to_string();
+                if status != "200" {
+                    return Err(format!(
+                        "API error (status {}): {}", 
+                        status,
+                        String::from_utf8_lossy(&response.body)
+                    ));
                 }
     
-                let response_data: OpenAIResponse = serde_json::from_slice(&response.body)
-                    .map_err(|e| format!("Failed to parse response: {}", e))?;
-    
-                Ok(response_data)
+                serde_json::from_slice(&response.body)
+                    .map_err(|e| format!("Failed to parse response: {}", e))
             }
-            Err((code, msg)) => Err(format!("HTTP request failed: {:?} {:?}", code, msg)),
+            Err((code, msg)) => Err(format!("HTTP request failed: {:?} - {}", code, msg)),
         }
     }
 }
 
-#[ic_cdk::update]
-fn transform_response(response: TransformArgs) -> HttpResponse {
-    response.response
-}
-
 #[ic_cdk::query]
-fn transform_response_query(response: TransformArgs) -> HttpResponse {
-    response.response
+fn transform_response_query(args: TransformArgs) -> HttpResponse {
+    let mut response = args.response;
+    
+    response.headers.push(HttpHeader {
+        name: "Access-Control-Allow-Origin".to_string(),
+        value: "*".to_string(),
+    });
+    
+    if let Ok(body_str) = String::from_utf8(response.body.clone()) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&body_str) {
+            return response;
+        }
+    }
+    
+    HttpResponse {
+        status: Nat::from(500u32),
+        headers: response.headers,
+        body: json!({
+            "error": "Invalid response format",
+            "timestamp": time(),
+        })
+        .to_string()
+        .into_bytes(),
+    }
 }
 
-#[ic_cdk::update]
-fn transform_response_update(response: TransformArgs) -> HttpResponse {
-    response.response
-}
