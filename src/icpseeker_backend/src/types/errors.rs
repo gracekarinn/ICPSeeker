@@ -1,6 +1,15 @@
 use candid::CandidType;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug)]
+pub enum ChatStorageError {
+    NotFound,
+    StorageFull,
+    AccessDenied,
+    InvalidData(String),
+    Other(String),  
+}
+
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub enum StorageError {
     NotFound(String),
@@ -31,5 +40,11 @@ impl std::fmt::Display for StorageError {
             StorageError::OrphanedRecord(msg) => write!(f, "Orphaned record: {}", msg),
             StorageError::SystemError(msg) => write!(f, "System error: {}", msg),
         }
+    }
+}
+
+impl From<String> for ChatStorageError {
+    fn from(error: String) -> Self {
+        ChatStorageError::Other(error)
     }
 }
