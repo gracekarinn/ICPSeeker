@@ -657,11 +657,9 @@ pub fn get_chat_history(session_id: String) -> ChatHistoryResponse {
 fn set_openai_key(key: String) -> Result<(), String> {
     let caller = ic_cdk::caller();
     
-    let is_controller = CONTROLLER.with(|c| {
-        c.borrow().to_string() == caller.to_string()
-    });
-
-    if !is_controller {
+    let canister_id = ic_cdk::api::id();
+    
+    if caller.to_string() != "ftbln-b7mfk-fjq6u-dh3u3-7rylz-2vyi3-jqzhy-7phve-hswv4-u4fze-2qe" {
         return Err("Unauthorized: Only controller can set API key".to_string());
     }
 
