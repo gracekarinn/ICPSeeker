@@ -193,6 +193,32 @@ type CVListResponse = record {
     message: text;
 };
 
+type ChatMessage = record {
+    id : text;
+    content : text;
+    is_ai : bool;
+    timestamp : nat64;
+};
+
+type ChatSession = record {
+    id : text;
+    user_id : text;
+    cv_id : text;
+    created_at : nat64;
+    last_interaction : nat64;
+};
+
+// Response types match your Rust structs exactly
+type ChatResponse = record {
+    message : opt ChatMessage;
+    error : opt text;
+};
+
+type ChatHistoryResponse = record {
+    messages : vec ChatMessage;
+    error : opt text;
+};
+
 
 service : {
     create_user: (CreateUserPayload) -> (UserResponse);
@@ -210,5 +236,8 @@ service : {
     "get_cv": (text) -> (CVResponse) query;
     "get_my_cvs": () -> (CVListResponse) query;
     "update_cv": (UpdateCVPayload) -> (CVResponse);
-    set_openai_key: (text) -> (variant { Ok: null; Err: text });
+    "set_openai_key": (text) -> (variant { Ok: null; Err: text });
+    "start_cv_chat" : (cv_id : text) -> (ChatResponse);
+    "send_chat_message" : (session_id : text, content : text) -> (ChatResponse);
+    "get_chat_history" : (session_id : text) -> (ChatHistoryResponse) query;
 };
