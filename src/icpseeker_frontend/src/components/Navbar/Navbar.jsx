@@ -1,8 +1,8 @@
 import React from "react";
 import { NavigationItems } from "./NavigationItems.jsx";
-import Button from "./button/index.jsx";
+import Button from "../button";
 
-export function Navbar() {
+export default function Navbar() {
     return (
         <header
             className="flex flex-wrap gap-10 justify-between items-center px-12 py-3 border-b-4 border-solid border-b-violet-100 max-md:px-5">
