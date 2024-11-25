@@ -5,20 +5,21 @@ use std::borrow::Cow;
 use ic_stable_structures::{Storable, BoundedStorable};
 use super::user::{string_to_fixed, fixed_to_string};
 
+pub type StorageKey = [u8; 32];  
 pub type FixedString = [u8; 32];
-pub type FixedContent = [u8; 1024]; 
+pub type FixedContent400 = [u8; 400]; 
+pub type FixedContent32 = [u8; 32];
 
 #[derive(Clone, Debug)]
 pub struct StableCV {
-    pub id: FixedString,
-    pub user_id: FixedString,
+    pub id: StorageKey,
+    pub user_id: StorageKey,
     pub title: FixedString,
-    pub content: FixedContent,
+    pub content: FixedContent400,
     pub version: u32,
-    pub ai_analysis_status: u8, // 0: Not analyzed, 1: In Progress, 2: Completed
-    pub ai_feedback: FixedContent,
+    pub ai_analysis_status: u8,
+    pub ai_feedback: FixedContent32,
 }
-
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct CV {
     pub id: String,
@@ -51,27 +52,32 @@ impl Storable for StableCV {
     }
 
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        fn read_fixed_string(bytes: &[u8], start: usize) -> FixedString {
-            let mut arr = [0u8; 32];
-            arr.copy_from_slice(&bytes[start..start + 32]);
-            arr
-        }
-
         let mut pos = 0;
-        let id = read_fixed_string(&bytes, pos);
+        
+        let mut id = [0u8; 32];
+        id.copy_from_slice(&bytes[pos..pos + 32]);
         pos += 32;
-        let user_id = read_fixed_string(&bytes, pos);
+
+        let mut user_id = [0u8; 32];
+        user_id.copy_from_slice(&bytes[pos..pos + 32]);
         pos += 32;
-        let title = read_fixed_string(&bytes, pos);
+
+        let mut title = [0u8; 32];
+        title.copy_from_slice(&bytes[pos..pos + 32]);
         pos += 32;
-        let content = read_fixed_content(&bytes, pos);
-        pos += 1024;
+
+        let mut content = [0u8; 400];
+        content.copy_from_slice(&bytes[pos..pos + 400]);
+        pos += 400;
         
         let version = u32::from_be_bytes(bytes[pos..pos + 4].try_into().unwrap());
         pos += 4;
+
         let ai_analysis_status = bytes[pos];
         pos += 1;
-        let ai_feedback = read_fixed_content(&bytes, pos);
+
+        let mut ai_feedback = [0u8; 32];
+        ai_feedback.copy_from_slice(&bytes[pos..pos + 32]);
 
         Self {
             id,
@@ -86,7 +92,7 @@ impl Storable for StableCV {
 }
 
 impl BoundedStorable for StableCV {
-    const MAX_SIZE: u32 = 32 * 3 + 1024 * 2 + 4 + 8 + 8 + 1;
+    const MAX_SIZE: u32 = 32 * 3 + 400 + 4 + 1 + 32;
     const IS_FIXED_SIZE: bool = true;
 }
 
@@ -96,17 +102,18 @@ impl From<CV> for StableCV {
             id: string_to_fixed(&cv.id),
             user_id: string_to_fixed(&cv.user_id),
             title: string_to_fixed(&cv.title),
-            content: string_to_fixed_content(&cv.content),
+            content: string_to_fixed_content_400(&cv.content),
             version: cv.version,
             ai_analysis_status: match cv.ai_analysis_status {
                 CVAnalysisStatus::NotAnalyzed => 0,
                 CVAnalysisStatus::InProgress => 1,
                 CVAnalysisStatus::Completed => 2,
             },
-            ai_feedback: string_to_fixed_content(&cv.ai_feedback.unwrap_or_default()),
+            ai_feedback: string_to_fixed_content_32(&cv.ai_feedback.unwrap_or_default()),
         }
     }
 }
+
 
 impl CV {
     pub fn new(
@@ -134,33 +141,44 @@ impl From<StableCV> for CV {
             id: fixed_to_string(&cv.id),
             user_id: fixed_to_string(&cv.user_id),
             title: fixed_to_string(&cv.title),
-            content: fixed_content_to_string(&cv.content),
+            content: fixed_content_to_string_400(&cv.content),
             version: cv.version,
             ai_analysis_status: match cv.ai_analysis_status {
                 0 => CVAnalysisStatus::NotAnalyzed,
                 1 => CVAnalysisStatus::InProgress,
                 _ => CVAnalysisStatus::Completed,
             },
-            ai_feedback: Some(fixed_content_to_string(&cv.ai_feedback)),
+            ai_feedback: Some(fixed_content_to_string_32(&cv.ai_feedback)),
         }
     }
 }
 
-fn read_fixed_content(bytes: &[u8], start: usize) -> FixedContent {
-    let mut arr = [0u8; 1024];
-    arr.copy_from_slice(&bytes[start..start + 1024]);
-    arr
-}
-
-fn string_to_fixed_content(s: &str) -> FixedContent {
-    let mut fixed = [0u8; 1024];
+fn string_to_fixed_content_400(s: &str) -> FixedContent400 {
+    let mut fixed = [0u8; 400];
     let bytes = s.as_bytes();
-    let len = bytes.len().min(1024);
+    let len = bytes.len().min(400);
     fixed[..len].copy_from_slice(&bytes[..len]);
     fixed
 }
 
-fn fixed_content_to_string(fixed: &FixedContent) -> String {
+fn string_to_fixed_content_32(s: &str) -> FixedContent32 {
+    let mut fixed = [0u8; 32];
+    let bytes = s.as_bytes();
+    let len = bytes.len().min(32);
+    fixed[..len].copy_from_slice(&bytes[..len]);
+    fixed
+}
+
+fn fixed_content_to_string_400(fixed: &FixedContent400) -> String {
+    String::from_utf8(
+        fixed.iter()
+            .take_while(|&&x| x != 0)
+            .copied()
+            .collect()
+    ).unwrap_or_default()
+}
+
+fn fixed_content_to_string_32(fixed: &FixedContent32) -> String {
     String::from_utf8(
         fixed.iter()
             .take_while(|&&x| x != 0)
