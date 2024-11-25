@@ -240,4 +240,6 @@ service : {
     "start_cv_chat" : (cv_id : text) -> (ChatResponse);
     "send_chat_message" : (session_id : text, content : text) -> (ChatResponse);
     "get_chat_history" : (session_id : text) -> (ChatHistoryResponse) query;
+    "clear_all_storage": () -> (variant { Ok: text; Err: text });
+    "clear_cv_storage": () -> (variant { Ok: text; Err: text });
 };
