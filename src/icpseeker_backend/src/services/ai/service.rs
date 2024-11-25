@@ -13,6 +13,7 @@ use candid::Func;
 use ic_cdk::api::call::CallResult;
 use candid::Principal;
 use candid::Nat;
+use crate::get_openai_key;
 
 pub struct AIService;
 
@@ -73,7 +74,21 @@ impl AIService {
     }
 
     async fn call_openai(request: OpenAIRequest) -> Result<OpenAIResponse, String> {
-        let api_key = AIConfig::default().api_key;
+        let api_key = match get_openai_key() {  
+            Ok(key) => key,
+            Err(e) => return Err(format!("OpenAI API key error: {}", e)),
+        };
+        
+        let request_headers = vec![
+            HttpHeader {
+                name: "Content-Type".to_string(),
+                value: "application/json".to_string(),
+            },
+            HttpHeader {
+                name: "Authorization".to_string(),
+                value: format!("Bearer {}", api_key),  
+            },
+        ];
         
         let request_headers = vec![
             HttpHeader {
@@ -104,7 +119,7 @@ impl AIService {
             headers: request_headers,
         };
     
-        match http_request(request, 0).await {
+        match http_request(request, 5_970_000).await {
             Ok((response,)) => {
                 let status = response.status.to_string();
                 if status != "200" {
