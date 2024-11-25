@@ -15,8 +15,6 @@ pub struct StableCV {
     pub title: FixedString,
     pub content: FixedContent,
     pub version: u32,
-    pub created_at: u64,
-    pub updated_at: u64,
     pub ai_analysis_status: u8, // 0: Not analyzed, 1: In Progress, 2: Completed
     pub ai_feedback: FixedContent,
 }
@@ -28,8 +26,6 @@ pub struct CV {
     pub title: String,
     pub content: String,
     pub version: u32,
-    pub created_at: u64,
-    pub updated_at: u64,
     pub ai_analysis_status: CVAnalysisStatus,
     pub ai_feedback: Option<String>,
 }
@@ -49,8 +45,6 @@ impl Storable for StableCV {
         bytes.extend_from_slice(&self.title);
         bytes.extend_from_slice(&self.content);
         bytes.extend_from_slice(&self.version.to_be_bytes());
-        bytes.extend_from_slice(&self.created_at.to_be_bytes());
-        bytes.extend_from_slice(&self.updated_at.to_be_bytes());
         bytes.push(self.ai_analysis_status);
         bytes.extend_from_slice(&self.ai_feedback);
         Cow::Owned(bytes)
@@ -75,10 +69,6 @@ impl Storable for StableCV {
         
         let version = u32::from_be_bytes(bytes[pos..pos + 4].try_into().unwrap());
         pos += 4;
-        let created_at = u64::from_be_bytes(bytes[pos..pos + 8].try_into().unwrap());
-        pos += 8;
-        let updated_at = u64::from_be_bytes(bytes[pos..pos + 8].try_into().unwrap());
-        pos += 8;
         let ai_analysis_status = bytes[pos];
         pos += 1;
         let ai_feedback = read_fixed_content(&bytes, pos);
@@ -89,8 +79,6 @@ impl Storable for StableCV {
             title,
             content,
             version,
-            created_at,
-            updated_at,
             ai_analysis_status,
             ai_feedback,
         }
@@ -110,8 +98,6 @@ impl From<CV> for StableCV {
             title: string_to_fixed(&cv.title),
             content: string_to_fixed_content(&cv.content),
             version: cv.version,
-            created_at: cv.created_at,
-            updated_at: cv.updated_at,
             ai_analysis_status: match cv.ai_analysis_status {
                 CVAnalysisStatus::NotAnalyzed => 0,
                 CVAnalysisStatus::InProgress => 1,
@@ -136,8 +122,6 @@ impl CV {
             title,
             content,
             version: 1,
-            created_at: timestamp,
-            updated_at: timestamp,
             ai_analysis_status: CVAnalysisStatus::NotAnalyzed,
             ai_feedback: None,
         }
@@ -152,8 +136,6 @@ impl From<StableCV> for CV {
             title: fixed_to_string(&cv.title),
             content: fixed_content_to_string(&cv.content),
             version: cv.version,
-            created_at: cv.created_at,
-            updated_at: cv.updated_at,
             ai_analysis_status: match cv.ai_analysis_status {
                 0 => CVAnalysisStatus::NotAnalyzed,
                 1 => CVAnalysisStatus::InProgress,
