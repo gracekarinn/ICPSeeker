@@ -49,13 +49,17 @@ impl ChatService {
             timestamp: time(),
         };
 
-        if let Err(e) = ChatStorage::store_message(welcome_message.clone()) {
+        if let Err(e) = ChatStorage::store_message(
+            &session.id,
+            welcome_message.content.clone(),
+            welcome_message.is_ai
+        ) {
             return ChatResponse {
                 message: None,
-                error: Some(format!("Failed to store welcome message: {}", e)),
+                error: Some(format!("Failed to store message: {}", e)),
             };
         }
-
+        
         ChatResponse {
             message: Some(welcome_message),
             error: None,
@@ -98,14 +102,18 @@ impl ChatService {
             is_ai: false,
             timestamp: time(),
         };
-
-        if let Err(e) = ChatStorage::store_message(user_message) {
+        
+        if let Err(e) = ChatStorage::store_message(
+            &session.id,
+            user_message.content.clone(),
+            user_message.is_ai
+        ) {
             return ChatResponse {
                 message: None,
                 error: Some(format!("Failed to store message: {}", e)),
             };
         }
-
+        
         session.touch();
         if let Err(e) = ChatSessionStorage::update_session(session.clone()) {
             return ChatResponse {
@@ -139,13 +147,17 @@ impl ChatService {
             timestamp: time(),
         };
 
-        if let Err(e) = ChatStorage::store_message(ai_response.clone()) {
+        if let Err(e) = ChatStorage::store_message(
+            &session.id,
+            ai_response.content.clone(),
+            ai_response.is_ai
+        ) {
             return ChatResponse {
                 message: None,
                 error: Some(format!("Failed to store AI response: {}", e)),
             };
         }
-
+    
         ChatResponse {
             message: Some(ai_response),
             error: None,
