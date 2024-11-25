@@ -40,10 +40,13 @@ mod models;
 mod storage;
 mod types;
 
+
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
 const MEMORY_ID_BANK: MemoryId = MemoryId::new(2);
+const MEMORY_ID_API_USAGE: MemoryId = MemoryId::new(3);
 const CV_MEM_ID: MemoryId = MemoryId::new(4);
+
 type CVMemory = VirtualMemory<DefaultMemoryImpl>;
 
 use crate::models::{
@@ -577,19 +580,11 @@ pub async fn upload_cv(payload: CreateCVPayload) -> CVResponse {
 #[ic_cdk::query]
 #[candid_method(query)]
 pub async fn get_cv(id: String) -> CVResponse {
-    let caller = ic_cdk::caller();
-    let user_id = caller.to_string();
+    let caller = ic_cdk::caller().to_string();
     
-    if !UserStorage::exists(&user_id) {
-        return CVResponse {
-            cv: None,
-            message: "User not found".to_string(),
-        };
-    }
-
     match CVStorage::get_cv(&id) {
         Ok(cv) => {
-            if cv.user_id != user_id {
+            if !cv.user_id.starts_with(&caller[..caller.len().min(cv.user_id.len())]) {
                 return CVResponse {
                     cv: None,
                     message: "Access denied".to_string(),
