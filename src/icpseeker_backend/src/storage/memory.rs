@@ -21,7 +21,7 @@ const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
 const MEMORY_ID_BANK: MemoryId = MemoryId::new(2);
 const MEMORY_ID_API_USAGE: MemoryId = MemoryId::new(3);
-const CV_MEM_ID : MemoryId = MemoryId::new(4);
+const MEMORY_ID_CV: MemoryId = MemoryId::new(4);
 const MEMORY_ID_CHAT: MemoryId = MemoryId::new(5);
 const MEMORY_ID_CHAT_SESSION: MemoryId = MemoryId::new(6);
 type CVMemory = VirtualMemory<DefaultMemoryImpl>;
@@ -51,7 +51,7 @@ thread_local! {
 
     static CV_STORAGE: RefCell<StableBTreeMap<StorageKey, StableCV, CVMemory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(CV_MEM_ID))
+            MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_CV))
         )
     );
 
@@ -60,12 +60,13 @@ thread_local! {
     );
 
     static CHAT_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatMessage, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
-        StableBTreeMap::new(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4))))
+        StableBTreeMap::new(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_CHAT)))
     );
 
-    static CHAT_SESSION_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatSession, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
-        StableBTreeMap::new(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))))
-    );
+    static CHAT_SESSION_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatSession, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_CHAT_SESSION));
+        StableBTreeMap::init(memory)
+    });
 
 }
 
@@ -512,16 +513,23 @@ impl APIUsageStorage {
 pub struct ChatStorage;
 
 impl ChatStorage {
-    pub fn store_message(message: ChatMessage) -> Result<(), String> {
-        let msg_id = message.id.clone();
-        let stable_message: StableChatMessage = message.into();
-        let fixed_id = string_to_fixed(&msg_id);
-
+    pub fn store_message(session_id: &str, content: String, is_ai: bool) -> Result<ChatMessage, String> {
+        let message = ChatMessage {
+            id: format!("msg_{}_{}", session_id, time()),
+            content,
+            is_ai,
+            timestamp: time(),
+        };
+        
+        let stable_message = StableChatMessage::from(message.clone());
         CHAT_STORAGE.with(|storage| {
-            match storage.borrow_mut().insert(fixed_id, stable_message) {
-                Some(_) | None => Ok(()),
-            }
-        })
+            storage.borrow_mut().insert(
+                string_to_fixed(&message.id),
+                stable_message
+            );
+        });
+        
+        Ok(message)
     }
 
     pub fn get_message(id: &str) -> Result<ChatMessage, String> {
@@ -594,14 +602,40 @@ pub struct ChatSessionStorage;
 
 impl ChatSessionStorage {
     pub fn create_session(user_id: &str, cv_id: &str) -> Result<ChatSession, ChatStorageError> {
-        let session = ChatSession::new(user_id.to_string(), cv_id.to_string());
+        let session_id = format!("chat_{}_{}", user_id, cv_id);
+        let session = ChatSession {
+            id: session_id.clone(),
+            user_id: user_id.to_string(),
+            cv_id: cv_id.to_string(),
+            created_at: time(),
+            last_interaction: time(),
+        };
+        
+        println!("Creating session with ID: {}", session_id);  // Debug
+
         let stable_session: StableChatSession = session.clone().into();
-        let fixed_id = string_to_fixed(&session.id);
-    
+        let fixed_id = string_to_fixed(&session_id);
+        
         CHAT_SESSION_STORAGE.with(|storage| {
             storage.borrow_mut().insert(fixed_id, stable_session);
             Ok(session)
         })
+    }
+
+    pub fn get_session(session_id: &str) -> Result<ChatSession, ChatStorageError> {
+        println!("Getting session with ID: {}", session_id);  // Debug
+        
+        let fixed_id = string_to_fixed(session_id);
+        let result = CHAT_SESSION_STORAGE.with(|storage| {
+            storage
+                .borrow()
+                .get(&fixed_id)
+                .map(|session| session.into())
+                .ok_or(ChatStorageError::NotFound)
+        });
+        
+        println!("Session lookup result: {:?}", result.is_ok());  // Debug
+        result
     }
     
     pub fn update_session(session: ChatSession) -> Result<(), ChatStorageError> {
@@ -611,18 +645,6 @@ impl ChatSessionStorage {
         CHAT_SESSION_STORAGE.with(|storage| {
             storage.borrow_mut().insert(fixed_id, stable_session);
             Ok(())
-        })
-    }
-
-    pub fn get_session(session_id: &str) -> Result<ChatSession, ChatStorageError> {
-        let fixed_id = string_to_fixed(session_id);
-
-        CHAT_SESSION_STORAGE.with(|storage| {
-            storage
-                .borrow()
-                .get(&fixed_id)
-                .map(|session| session.into())
-                .ok_or(ChatStorageError::NotFound)
         })
     }
 
