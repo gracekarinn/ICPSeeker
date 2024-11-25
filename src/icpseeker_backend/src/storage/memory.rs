@@ -20,7 +20,10 @@ use crate::models::RateLimitConfig;
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
 const MEMORY_ID_BANK: MemoryId = MemoryId::new(2);
-const CV_MEM_ID: MemoryId = MemoryId::new(4);
+const MEMORY_ID_API_USAGE: MemoryId = MemoryId::new(3);
+const CV_MEM_ID : MemoryId = MemoryId::new(4);
+const MEMORY_ID_CHAT: MemoryId = MemoryId::new(5);
+const MEMORY_ID_CHAT_SESSION: MemoryId = MemoryId::new(6);
 type CVMemory = VirtualMemory<DefaultMemoryImpl>;
 
 
@@ -83,7 +86,6 @@ impl UserStorage {
     }
 
      pub fn save_with_validation(user: UserProfile) -> Result<(), StorageError> {
-        // Input validation
         if user.name.trim().is_empty() {
             return Err(StorageError::ValidationError("Name cannot be empty".to_string()));
         }
