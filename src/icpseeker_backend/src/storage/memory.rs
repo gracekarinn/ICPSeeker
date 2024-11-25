@@ -404,7 +404,6 @@ impl CVStorage {
                 let mut regular_cv = CV::from(cv);
                 regular_cv.ai_analysis_status = status;
                 regular_cv.ai_feedback = feedback;
-                regular_cv.updated_at = ic_cdk::api::time();
                 
                 let stable_cv = StableCV::from(regular_cv);
                 storage.insert(fixed_id, stable_cv);
