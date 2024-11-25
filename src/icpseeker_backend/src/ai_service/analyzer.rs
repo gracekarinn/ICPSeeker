@@ -37,7 +37,6 @@ impl CVAnalyzer {
 
         cv.ai_analysis_status = CVAnalysisStatus::Completed;
         cv.ai_feedback = Some(serde_json::to_string(&analysis_result).map_err(|e| e.to_string())?);
-        cv.updated_at = time();
 
         CVStorage::update_cv(cv).map_err(|e| format!("Failed to store analysis results: {}", e))?;
 
