@@ -14,5 +14,8 @@
   "type": "module",
   "workspaces": [
     "src/icpseeker_frontend"
-  ]
+  ],
+  "dependencies": {
+    "dfx": "^0.106.0"
+  }
 }
