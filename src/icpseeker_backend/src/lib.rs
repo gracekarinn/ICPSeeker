@@ -31,6 +31,7 @@ use crate::models::{
 use ic_cdk::api::time;
 use crate::storage::memory::ChatSessionStorage;  
 use crate::storage::ChatStorage;
+use crate::auth::{AuthService, Session};
 
 pub mod ai_service;
 pub mod services {
@@ -41,6 +42,7 @@ mod validation;
 mod models;
 mod storage;
 mod types;
+mod auth;
 
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
@@ -121,7 +123,11 @@ fn init() {
     });
 }
 
-
+#[ic_cdk::query]
+#[candid_method(query)]
+fn get_principal() -> Principal {
+    ic_cdk::api::caller()
+}
 
 #[derive(CandidType, Serialize, Deserialize)]
 pub struct CreateUserPayload {
@@ -285,7 +291,16 @@ pub async fn get_user_by_id(user_id: String) -> UserResponse {
 #[ic_cdk::update]
 #[candid_method(update)]
 pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
-    let user_id = ic_cdk::api::caller().to_string();
+    let principal = ic_cdk::api::caller();
+    
+    if !AuthService::is_authenticated(&principal) {
+        return UserResponse::Error("Not authenticated".to_string());
+    }
+
+    let user_id = match AuthService::get_user_id(&principal) {
+        Some(id) => id,
+        None => return UserResponse::Error("User not found".to_string()),
+    };
     
     let mut user = match UserStorage::get(&user_id) {
         Some(user) => user,
@@ -831,6 +846,48 @@ fn clear_cv_storage() -> Result<String, String> {
 
     Ok("CV storage cleared successfully".to_string())
 }
+
+#[ic_cdk::update]
+#[candid_method(update)]
+async fn login() -> Result<Session, String> {
+    let principal = ic_cdk::api::caller();
+    
+    if principal == Principal::anonymous() {
+        return Err("Anonymous principals cannot log in".to_string());
+    }
+
+    let session = AuthService::create_session(principal);
+
+    if AuthService::get_user_id(&principal).is_none() {
+        let user_id = principal.to_string();
+        
+        let user = UserProfile::new(
+            user_id.clone(),
+            String::new(), 
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+        );
+
+        match UserStorage::save_with_validation(user) {
+            Ok(_) => {
+                AuthService::associate_user_principal(principal, user_id);
+            }
+            Err(e) => return Err(format!("Failed to create user profile: {:?}", e)),
+        }
+    }
+
+    Ok(session)
+}
+
+#[ic_cdk::query]
+#[candid_method(query)]
+fn is_logged_in() -> bool {
+    let principal = ic_cdk::api::caller();
+    AuthService::is_authenticated(&principal)
+}
+
 
 
 ic_cdk::export_candid!();
