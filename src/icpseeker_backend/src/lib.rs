@@ -16,6 +16,18 @@ use crate::services::chat::ChatService;
 use crate::ai_service::analyzer;
 pub use crate::ai_service::analyzer::CVAnalyzer;
 use ic_cdk::api::management_canister::http_request::{ http_request, CanisterHttpRequestArgument, HttpMethod, TransformContext, HttpHeader, HttpResponse, TransformArgs };
+use ic_stable_structures::memory_manager::{MemoryId, VirtualMemory};
+use ic_stable_structures::StableBTreeMap;
+use crate::models::{
+    StorageKey,
+    FixedString,
+    user::StableUserProfile,
+    bank::StableBankInformation,
+    education::StableEducationRecord,
+    cv::StableCV,
+    chat::{StableChatMessage, StableChatSession},
+    rate_limit::StableUserAPIUsage,
+};
 
 
 pub mod ai_service;
@@ -28,6 +40,11 @@ mod models;
 mod storage;
 mod types;
 
+const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
+const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
+const MEMORY_ID_BANK: MemoryId = MemoryId::new(2);
+const CV_MEM_ID: MemoryId = MemoryId::new(4);
+type CVMemory = VirtualMemory<DefaultMemoryImpl>;
 
 use crate::models::{
     UserProfile,
@@ -44,8 +61,45 @@ thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> = RefCell::new(
         MemoryManager::init(DefaultMemoryImpl::default())
     );
-    static OPENAI_API_KEY: RefCell<String> = RefCell::new(String::new());
+
     static CONTROLLER: RefCell<Principal> = RefCell::new(Principal::anonymous());
+    
+    static OPENAI_API_KEY: RefCell<String> = RefCell::new(String::new());
+
+    static USERS: RefCell<StableBTreeMap<StorageKey, StableUserProfile, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_USERS));
+        StableBTreeMap::init(memory)
+    });
+
+    static BANK_INFO: RefCell<StableBTreeMap<StorageKey, StableBankInformation, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_BANK));
+        StableBTreeMap::init(memory)
+    });
+
+    static CV_STORAGE: RefCell<StableBTreeMap<StorageKey, StableCV, CVMemory>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(CV_MEM_ID));
+        StableBTreeMap::init(memory)
+    });
+
+    static EDUCATION_RECORDS: RefCell<StableBTreeMap<StorageKey, StableEducationRecord, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_EDUCATION));
+        StableBTreeMap::init(memory)
+    });
+
+    static API_USAGE_STORAGE: RefCell<StableBTreeMap<FixedString, StableUserAPIUsage, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3)));
+        StableBTreeMap::init(memory)
+    });
+
+    static CHAT_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatMessage, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)));
+        StableBTreeMap::init(memory)
+    });
+
+    static CHAT_SESSION_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatSession, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5)));
+        StableBTreeMap::init(memory)
+    });
 }
 
 #[ic_cdk::init]
@@ -602,7 +656,6 @@ pub async fn update_cv(payload: UpdateCVPayload) -> CVResponse {
 
             cv.title = payload.title;
             cv.content = payload.content;
-            cv.updated_at = ic_cdk::api::time();
             cv.ai_analysis_status = CVAnalysisStatus::NotAnalyzed;
             cv.ai_feedback = None;
 
@@ -680,5 +733,62 @@ pub fn get_openai_key() -> Result<String, String> {
         }
     })
 }
+
+#[ic_cdk::update]
+#[candid_method(update)]
+fn clear_all_storage() -> Result<String, String> {
+    let caller = ic_cdk::caller();
+    
+    if caller.to_string() != "ftbln-b7mfk-fjq6u-dh3u3-7rylz-2vyi3-jqzhy-7phve-hswv4-u4fze-2qe" {
+        return Err("Unauthorized: Only controller can clear storage".to_string());
+    }
+
+    USERS.with(|users| {
+        let mut users = users.borrow_mut();
+        let keys: Vec<_> = users.iter().map(|(k, _)| k).collect();
+        for key in keys {
+            users.remove(&key);
+        }
+    });
+
+    BANK_INFO.with(|bank_info| {
+        let mut bank_info = bank_info.borrow_mut();
+        let keys: Vec<_> = bank_info.iter().map(|(k, _)| k).collect();
+        for key in keys {
+            bank_info.remove(&key);
+        }
+    });
+
+    CV_STORAGE.with(|storage| {
+        let mut storage = storage.borrow_mut();
+        let keys: Vec<_> = storage.iter().map(|(k, _)| k).collect();
+        for key in keys {
+            storage.remove(&key);
+        }
+    });
+
+    Ok("All storage cleared successfully".to_string())
+}
+
+#[ic_cdk::update]
+#[candid_method(update)]
+fn clear_cv_storage() -> Result<String, String> {
+    let caller = ic_cdk::caller();
+    
+    if caller.to_string() != "ftbln-b7mfk-fjq6u-dh3u3-7rylz-2vyi3-jqzhy-7phve-hswv4-u4fze-2qe" {
+        return Err("Unauthorized: Only controller can clear storage".to_string());
+    }
+
+    CV_STORAGE.with(|storage| {
+        let mut storage = storage.borrow_mut();
+        let keys: Vec<_> = storage.iter().map(|(k, _)| k).collect();
+        for key in keys {
+            storage.remove(&key);
+        }
+    });
+
+    Ok("CV storage cleared successfully".to_string())
+}
+
 
 ic_cdk::export_candid!();
