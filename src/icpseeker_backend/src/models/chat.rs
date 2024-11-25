@@ -36,11 +36,16 @@ pub struct ChatSession {
 
 #[derive(Clone, Debug)]
 pub struct StableChatSession {
-    pub id: FixedString,
-    pub user_id: FixedString,
-    pub cv_id: FixedString,
-    pub created_at: u64,
-    pub last_interaction: u64,
+    pub id: FixedString,           // 32 bytes
+    pub user_id: FixedString,      // 32 bytes
+    pub cv_id: FixedString,        // 32 bytes
+    pub created_at: u64,           // 8 bytes
+    pub last_interaction: u64,     // 8 bytes
+}
+
+impl BoundedStorable for StableChatSession {
+    const MAX_SIZE: u32 = (32 * 3) + (8 * 2);  
+    const IS_FIXED_SIZE: bool = true;
 }
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
@@ -175,10 +180,6 @@ impl Storable for StableChatSession {
     }
 }
 
-impl BoundedStorable for StableChatSession {
-    const MAX_SIZE: u32 = 32 * 3 + 8 * 2; 
-    const IS_FIXED_SIZE: bool = true;
-}
 
 impl ChatSession {
     pub fn new(user_id: String, cv_id: String) -> Self {
