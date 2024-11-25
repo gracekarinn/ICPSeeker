@@ -177,8 +177,6 @@ type CV = record {
     title: text;
     content: text;
     version: nat32;
-    created_at: nat64;
-    updated_at: nat64;
     ai_analysis_status: CVAnalysisStatus;
     ai_feedback: opt text;
 };
