@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { icpseeker_backend } from "declarations/icpseeker_backend";
+import React from "react";
+import Button from "./components/button";
+import { FaHome } from "react-icons/fa"; 
 
 function App() {
   const [greeting, setGreeting] = useState("");
@@ -113,6 +116,41 @@ function App() {
         <div className="bg-state-danger text-white">Danger</div>
         <div className="bg-neutral-300 text-neutral-900">Neutral Colors</div>
     </div>
+    <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50 p-8">
+      <h1 className="text-3xl font-heading mb-6">Button Variants</h1>
+      <div className="flex flex-wrap gap-4">
+        {/* Primary Button */}
+        <Button variant="primary" size="medium">
+          Primary
+        </Button>
+
+        {/* Secondary Button */}
+        <Button variant="secondary" size="medium">
+          Secondary
+        </Button>
+
+        {/* Neutral Button */}
+        <Button variant="neutral" size="medium">
+          Neutral
+        </Button>
+
+        {/* Gradient Button */}
+        <Button variant="gradient" size="large">
+          Gradient
+        </Button>
+
+        {/* Button with Icon */}
+        <Button variant="primary" size="medium" icon={<FaHome />}>
+          With Icon
+        </Button>
+
+        {/* Loading Button */}
+        <Button variant="primary" size="medium" isLoading={true}>
+          Loading
+        </Button>
+      </div>
+    </div>
+
     </main>
   );
 }
