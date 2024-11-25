@@ -216,9 +216,20 @@ type ChatHistoryResponse = record {
     error : opt text;
 };
 
+type Session = record {
+    principal_id: principal;
+    expires_at: nat64;
+};
+
+type AuthResponse = variant {
+    Ok: Session;
+    Err: text;
+};
 
 service : {
-    create_user: (CreateUserPayload) -> (UserResponse);
+    "login": () -> (AuthResponse);
+    "get_principal": () -> (principal) query;
+    "is_logged_in": () -> (bool) query;
     get_user: () -> (UserResponse) query;
     get_user_by_id: (text) -> (UserResponse) query;
     update_user: (UpdateUserPayload) -> (UserResponse);
@@ -234,9 +245,9 @@ service : {
     "get_my_cvs": () -> (CVListResponse) query;
     "update_cv": (UpdateCVPayload) -> (CVResponse);
     set_openai_key: (text) -> (variant { Ok: null; Err: text });
-    start_cv_chat : (cv_id : text) -> (ChatResponse);
-    send_chat_message : (session_id : text, content : text) -> (ChatResponse);
-    get_chat_history : (session_id : text) -> (ChatHistoryResponse) query;
+    start_cv_chat: (cv_id: text) -> (ChatResponse);
+    send_chat_message: (session_id: text, content: text) -> (ChatResponse);
+    get_chat_history: (session_id: text) -> (ChatHistoryResponse) query;
     clear_all_storage: () -> (variant { Ok: text; Err: text });
-    clear_cv_storage : () -> (variant { Ok: text; Err: text });
+    clear_cv_storage: () -> (variant { Ok: text; Err: text });
 };
