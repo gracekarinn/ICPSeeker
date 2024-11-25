@@ -91,6 +91,17 @@ function App() {
           <p className="text-p6 font-body font-semibold">B6: Semi-Bold - 10px, 150% Line Height</p>
         </div>
       </div>
+        <div className="flex flex-row flex-wrap gap-4 p-4">
+        <div className="bg-purple-light p-4">Light Background</div>
+        <div className="bg-purple-normal text-purple-darker p-4">Normal Text</div>
+        <div className="hover:bg-purple-dark-active p-4">Hover State</div>
+        <div className="bg-orange-light p-4">Light Orange Background</div>
+        <div className="text-orange-darker p-4">Darker Orange Text</div>
+        <div className="hover:bg-orange-dark-active p-4">Hover State</div>
+        <div className="bg-blue-light p-4">Light Blue Background</div>
+        <div className="text-blue-darker p-4">Darker Blue Text</div>
+        <div className="hover:bg-blue-dark-active p-4">Hover State</div>
+    </div>
     </main>
   );
 }
