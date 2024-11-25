@@ -6,8 +6,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['"Plus Jakarta Sans"'], // Hanya Plus Jakarta Sans
-        body: ['Syne'], // Hanya Syne
+        heading: ['"Plus Jakarta Sans"'], 
+        body: ['Syne'], 
       },
       fontSize: {
         // Headings (Plus Jakarta Sans)
@@ -26,6 +26,44 @@ export default {
         p5: ['0.75rem', { lineHeight: '150%', fontWeight: '400' }], // 12px, 18px line-height
         p6: ['0.625rem', { lineHeight: '150%', fontWeight: '400' }], // 10px, 15px line-height
       },
+      colors: {
+        purple: {
+          light: "#efe7fd", 
+          "light-hover": "#e7dbfb", 
+          "light-active": "#cdb4f8", 
+          normal: "#5f0ee7",
+          "normal-hover": "#560dd0", 
+          "normal-active": "#4c0bb9", 
+          dark: "#470bad", 
+          "dark-hover": "#39088b", 
+          "dark-active": "#2b0668", 
+          darker: "#210551", 
+        },
+        orange: {
+          light: "#fff0e7", 
+          "light-hover": "#ffe8db", 
+          "light-active": "#ffd0b4", 
+          normal: "#ff660e", 
+          "normal-hover": "#e65c0d", 
+          "normal-active": "#cc520b", 
+          dark: "#bf4d0b", 
+          "dark-hover": "#993d08", 
+          "dark-active": "#732e06", 
+          darker: "#592405",
+        },
+        blue: {
+          light: "#f7f2ff", 
+          "light-hover": "#f3ecff", 
+          "light-active": "#e7d7fe",
+          normal: "#b07ffc", 
+          "normal-hover": "#9e72e3", 
+          "normal-active": "#8d66ca",
+          dark: "#845fbd",
+          "dark-hover": "#6a4c97", 
+          "dark-active": "#4f3971", 
+          darker: "#3e2c58", 
+        },
+      },      
     },
   },
   plugins: [],
