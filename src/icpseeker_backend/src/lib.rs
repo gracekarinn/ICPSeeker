@@ -25,10 +25,12 @@ use crate::models::{
     bank::StableBankInformation,
     education::StableEducationRecord,
     cv::StableCV,
-    chat::{StableChatMessage, StableChatSession},
+    chat::{StableChatMessage, StableChatSession, ChatMessage},
     rate_limit::StableUserAPIUsage,
 };
-
+use ic_cdk::api::time;
+use crate::storage::memory::ChatSessionStorage;  
+use crate::storage::ChatStorage;
 
 pub mod ai_service;
 pub mod services {
@@ -40,12 +42,13 @@ mod models;
 mod storage;
 mod types;
 
-
 const MEMORY_ID_USERS: MemoryId = MemoryId::new(0);
 const MEMORY_ID_EDUCATION: MemoryId = MemoryId::new(1);
 const MEMORY_ID_BANK: MemoryId = MemoryId::new(2);
 const MEMORY_ID_API_USAGE: MemoryId = MemoryId::new(3);
-const CV_MEM_ID: MemoryId = MemoryId::new(4);
+const MEMORY_ID_CV: MemoryId = MemoryId::new(4);
+const MEMORY_ID_CHAT: MemoryId = MemoryId::new(5);
+const MEMORY_ID_CHAT_SESSION: MemoryId = MemoryId::new(6);
 
 type CVMemory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -80,7 +83,7 @@ thread_local! {
     });
 
     static CV_STORAGE: RefCell<StableBTreeMap<StorageKey, StableCV, CVMemory>> = RefCell::new({
-        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(CV_MEM_ID));
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_CV));
         StableBTreeMap::init(memory)
     });
 
@@ -94,13 +97,13 @@ thread_local! {
         StableBTreeMap::init(memory)
     });
 
-    static CHAT_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatMessage, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
-        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)));
-        StableBTreeMap::init(memory)
-    });
-
+    static CHAT_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatMessage, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new(
+        StableBTreeMap::new(MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_CHAT)))
+    );
+    
+   
     static CHAT_SESSION_STORAGE: RefCell<StableBTreeMap<FixedString, StableChatSession, VirtualMemory<DefaultMemoryImpl>>> = RefCell::new({
-        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5)));
+        let memory = MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_CHAT_SESSION));
         StableBTreeMap::init(memory)
     });
 }
@@ -688,9 +691,53 @@ pub async fn start_cv_chat(cv_id: String) -> ChatResponse {
 
 #[ic_cdk::update]
 #[candid_method(update)]
-pub async fn send_chat_message(session_id: String, content: String) -> ChatResponse {
+pub async fn send_chat_message(
+    session_id: String, 
+    content: String
+) -> ChatResponse {
     let caller = ic_cdk::caller().to_string();
-    ChatService::send_message(&session_id, &caller, content).await
+    println!("Caller ID: {}", caller);
+
+    let session = match ChatSessionStorage::get_session(&session_id) {
+        Ok(session) => {
+            println!("Session user_id: {}", session.user_id);
+            if session.user_id != caller {  // Remove .to_string()
+                return ChatResponse {
+                    message: None,
+                    error: Some("Access denied to this chat session".to_string()),
+                };
+            }
+            session
+        }
+        Err(_) => {
+            return ChatResponse {
+                message: None,
+                error: Some("Chat session not found".to_string()),
+            };
+        }
+    };
+
+    let message = ChatMessage {
+        id: format!("msg_{}_{}", session_id, time()),
+        content: content.clone(),
+        is_ai: false,
+        timestamp: time(),
+    };
+
+    if let Err(e) = ChatStorage::store_message(
+        &session.id,
+        message.content.clone(),
+        message.is_ai
+    ) {
+        return ChatResponse {
+            message: None,
+            error: Some(format!("Failed to store message: {}", e)),
+        };
+    }
+    
+    // Let ChatService handle the AI communication
+    let result = ChatService::send_message(&session_id, &caller, content).await;
+    result
 }
 
 #[ic_cdk::query]
