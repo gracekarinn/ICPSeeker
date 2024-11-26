@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthButton from "./components/Auth/AuthButton";
+import Navbar from "./components/Navbar/Navbar";
 
 const ProfileSetup = () => (
   <div className="p-8 text-center">
