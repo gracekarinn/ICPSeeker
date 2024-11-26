@@ -1,19 +1,46 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import AuthButton from "./components/Auth/AuthButton";
-import Navbar from "./components/Navbar/Navbar";
+
+const ProtectedRoute = ({ children }) => {
+  const checkAuth = async () => {
+    try {
+      const authClient = await AuthManager.create();
+      return await authClient.isAuthenticated();
+    } catch (error) {
+      console.error("Auth check failed:", error);
+      return false;
+    }
+  };
+
+  if (!checkAuth()) {
+    return <Navigate to="/" />;
+  }
+
+  return children;
+};
 
 const ProfileSetup = () => (
-  <div className="p-8 text-center">
-    <h1 className="text-2xl mb-4">Profile Setup</h1>
-    <pre>Profile form will go here</pre>
+  <div className="p-8">
+    <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Profile Setup</h1>
+        <AuthButton />
+      </div>
+      <pre>Profile form will go here</pre>
+    </div>
   </div>
 );
 
 const Dashboard = () => (
-  <div className="p-8 text-center">
-    <h1 className="text-2xl mb-4">Dashboard</h1>
-    <pre>Dashboard content will go here</pre>
+  <div className="p-8">
+    <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <AuthButton />
+      </div>
+      <pre>Dashboard content will go here</pre>
+    </div>
   </div>
 );
 
@@ -31,8 +58,22 @@ function App() {
               </div>
             }
           />
-          <Route path="/profile-setup" element={<ProfileSetup />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route
+            path="/profile-setup"
+            element={
+              <ProtectedRoute>
+                <ProfileSetup />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </BrowserRouter>
