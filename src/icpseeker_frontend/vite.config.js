@@ -8,20 +8,10 @@ import autoprefixer from "autoprefixer";
 
 dotenv.config();
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
-    build: {
-      commonjsOptions: {
-        include: [/node_modules/],
-        transformMixedEsModules: true,
-      },
-      rollupOptions: {
-        external: [],
-      },
-    },
     optimizeDeps: {
       esbuildOptions: {
         define: {
@@ -41,17 +31,24 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      host: "localhost",
+      host: true,
       port: 3000,
       proxy: {
         "/api": {
           target: "http://localhost:4943",
           changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/api/, ""),
         },
       },
       headers: {
         "Cross-Origin-Opener-Policy": "same-origin",
         "Cross-Origin-Embedder-Policy": "require-corp",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods":
+          "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+        "Access-Control-Allow-Headers":
+          "Content-Type, Authorization, X-Requested-With",
       },
     },
     plugins: [react(), environment("all", { prefix: "VITE_" })],
@@ -81,6 +78,26 @@ export default defineConfig(({ mode }) => {
       "process.env.CANISTER_ID_ICPSEEKER_BACKEND": JSON.stringify(
         env.CANISTER_ID_ICPSEEKER_BACKEND
       ),
+      "process.env.HOST": JSON.stringify(env.HOST || "http://localhost:4943"),
+      "process.env.VITE_DFX_NETWORK": JSON.stringify(
+        env.DFX_NETWORK || "local"
+      ),
+    },
+    envPrefix: ["VITE_", "CANISTER_", "DFX_"],
+    build: {
+      target: "esnext",
+      minify: false,
+      sourcemap: true,
+      commonjsOptions: {
+        include: [/node_modules/],
+        transformMixedEsModules: true,
+      },
+      rollupOptions: {
+        external: [],
+        output: {
+          manualChunks: undefined,
+        },
+      },
     },
   };
 });
