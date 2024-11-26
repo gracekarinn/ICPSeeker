@@ -8,9 +8,6 @@
         "id": {
           "ic": "bkyz2-fmaaa-aaaaa-qaaaq-cai"
         }
-      },
-      "frontend": {
-        "entrypoint": "index.html"
       }
     },
     "icpseeker_backend": {
