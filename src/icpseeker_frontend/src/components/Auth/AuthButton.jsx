@@ -1,70 +1,89 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { AuthManager } from "../../auth/AuthManager";
+import { icpseeker_backend } from "../../../../declarations/icpseeker_backend";
 
-export default function AuthButton() {
+const AuthButton = () => {
+  const [authClient, setAuthClient] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
+    const initAuth = async () => {
+      try {
+        const client = await AuthManager.create();
+        setAuthClient(client);
+        const authenticated = await client.isAuthenticated();
+        setIsAuthenticated(authenticated);
+
+        if (authenticated) {
+          await checkUserProfile(client);
+        }
+      } catch (error) {
+        console.error("Auth initialization failed:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    initAuth();
   }, []);
 
-  const checkAuth = async () => {
+  const checkUserProfile = async (client) => {
     try {
-      const authenticated = await AuthManager.isAuthenticated();
-      setIsAuthenticated(authenticated);
+      const agent = await client.getAgent();
+      const actor = icpseeker_backend.createActor(agent);
+      const response = await actor.get_user();
+
+      if ("Success" in response) {
+        window.location.href = "/dashboard";
+      } else {
+        window.location.href = "/profile-setup";
+      }
     } catch (error) {
-      console.error("Auth check failed:", error);
-    } finally {
-      setIsLoading(false);
+      console.error("Error checking profile:", error);
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      setIsLoading(true);
-      await AuthManager.login();
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error("Login failed:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      setIsLoading(true);
-      await AuthManager.logout();
-      setIsAuthenticated(false);
-    } catch (error) {
-      console.error("Logout failed:", error);
-    } finally {
-      setIsLoading(false);
+  const handleAuth = async () => {
+    if (isAuthenticated) {
+      try {
+        await authClient.logout();
+        setIsAuthenticated(false);
+        window.location.reload();
+      } catch (error) {
+        console.error("Logout failed:", error);
+      }
+    } else {
+      try {
+        await authClient.login();
+      } catch (error) {
+        console.error("Login failed:", error);
+      }
     }
   };
 
   if (isLoading) {
     return (
-      <button className="px-4 py-2 bg-gray-200 rounded-md" disabled>
+      <button
+        className="bg-gray-400 text-white font-bold py-2 px-4 rounded opacity-50 cursor-not-allowed"
+        disabled
+      >
         Loading...
       </button>
     );
   }
 
-  return isAuthenticated ? (
+  return (
     <button
-      onClick={handleLogout}
-      className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+      onClick={handleAuth}
+      className={`font-bold py-2 px-4 rounded transition-colors ${
+        isAuthenticated
+          ? "bg-red-500 hover:bg-red-700 text-white"
+          : "bg-blue-500 hover:bg-blue-700 text-white"
+      }`}
     >
-      Logout
-    </button>
-  ) : (
-    <button
-      onClick={handleLogin}
-      className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-    >
-      Login with Internet Identity
+      {isAuthenticated ? "Logout" : "Login with Internet Identity"}
     </button>
   );
-}
+};
+
+export default AuthButton;
