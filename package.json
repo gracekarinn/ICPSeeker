@@ -16,6 +16,7 @@
     "src/icpseeker_frontend"
   ],
   "dependencies": {
-    "dfx": "^0.106.0"
+    "dfx": "^0.106.0",
+    "prop-types": "^15.8.1"
   }
 }
