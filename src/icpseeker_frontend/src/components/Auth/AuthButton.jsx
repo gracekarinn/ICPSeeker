@@ -1,70 +1,70 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { AuthManager } from "../../auth/AuthManager";
 
-export default function AuthButton() {
+const AuthButton = () => {
+  const [authClient, setAuthClient] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    const initAuth = async () => {
+      try {
+        const client = await AuthManager.create();
+        setAuthClient(client);
+        const authenticated = await client.isAuthenticated();
+        setIsAuthenticated(authenticated);
 
-  const checkAuth = async () => {
-    try {
-      const authenticated = await AuthManager.isAuthenticated();
-      setIsAuthenticated(authenticated);
-    } catch (error) {
-      console.error("Auth check failed:", error);
-    } finally {
+        if (authenticated) {
+          navigate("/profile-setup");
+        }
+      } catch (error) {
+        console.error("Auth initialization failed:", error);
+      }
       setIsLoading(false);
-    }
-  };
+    };
 
-  const handleLogin = async () => {
-    try {
-      setIsLoading(true);
-      await AuthManager.login();
-      setIsAuthenticated(true);
-    } catch (error) {
-      console.error("Login failed:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    initAuth();
+  }, [navigate]);
 
-  const handleLogout = async () => {
+  const handleAuth = async () => {
     try {
-      setIsLoading(true);
-      await AuthManager.logout();
-      setIsAuthenticated(false);
+      if (isAuthenticated) {
+        await authClient.logout();
+        setIsAuthenticated(false);
+        navigate("/");
+      } else {
+        await authClient.login();
+      }
     } catch (error) {
-      console.error("Logout failed:", error);
-    } finally {
-      setIsLoading(false);
+      console.error("Auth action failed:", error);
     }
   };
 
   if (isLoading) {
     return (
-      <button className="px-4 py-2 bg-gray-200 rounded-md" disabled>
+      <button
+        className="bg-gray-400 text-white font-bold py-2 px-4 rounded opacity-50 cursor-not-allowed"
+        disabled
+      >
         Loading...
       </button>
     );
   }
 
-  return isAuthenticated ? (
+  return (
     <button
-      onClick={handleLogout}
-      className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+      onClick={handleAuth}
+      className={`font-bold py-2 px-4 rounded transition-colors ${
+        isAuthenticated
+          ? "bg-red-500 hover:bg-red-700 text-white"
+          : "bg-blue-500 hover:bg-blue-700 text-white"
+      }`}
     >
-      Logout
-    </button>
-  ) : (
-    <button
-      onClick={handleLogin}
-      className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-    >
-      Login with Internet Identity
+      {isAuthenticated ? "Logout" : "Login with Internet Identity"}
     </button>
   );
-}
+};
+
+export default AuthButton;

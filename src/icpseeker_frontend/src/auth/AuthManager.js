@@ -1,129 +1,162 @@
 import { AuthClient } from "@dfinity/auth-client";
 import { HttpAgent } from "@dfinity/agent";
-
-const DFX_NETWORK = process.env.DFX_NETWORK || "local";
-const II_CANISTER_ID =
-  process.env.CANISTER_ID_INTERNET_IDENTITY || "be2us-64aaa-aaaaa-qaabq-cai";
-
-const LOCAL_HOST =
-  window.location.hostname === "localhost" ? "localhost" : "127.0.0.1";
-const LOCAL_PORT = "4943";
-
-const getHost = () => {
-  return DFX_NETWORK === "ic"
-    ? "https://identity.ic0.app"
-    : `http://${LOCAL_HOST}:${LOCAL_PORT}`;
-};
-
-const II_URL =
-  DFX_NETWORK === "ic"
-    ? "https://identity.ic0.app/#authorize"
-    : `http://${LOCAL_HOST}:${LOCAL_PORT}?canisterId=${II_CANISTER_ID}#authorize`;
+import { createActor } from "../../../declarations/icpseeker_backend";
 
 export class AuthManager {
-  static #authClient = null;
-  static #agent = null;
-
-  static async init() {
-    if (!this.#authClient) {
-      try {
-        this.#authClient = await AuthClient.create({
-          idleOptions: {
-            disableIdle: true,
-            disableDefaultIdleCallback: true,
-          },
-        });
-
-        this.#agent = new HttpAgent({
-          host: getHost(),
-        });
-
-        if (DFX_NETWORK !== "ic") {
-          await this.#agent.fetchRootKey().catch(console.error);
-        }
-
-        await this.#handleAuthenticated();
-      } catch (error) {
-        console.error("Failed to initialize auth client:", error);
-      }
+  static async create() {
+    try {
+      const authClient = await AuthClient.create();
+      return new AuthManager(authClient);
+    } catch (error) {
+      console.error("Failed to create AuthClient:", error);
+      throw new Error("Authentication initialization failed");
     }
-    return this.#authClient;
   }
 
-  static async login() {
-    try {
-      const authClient = await this.init();
+  constructor(authClient) {
+    this.authClient = authClient;
+    this.authStateListeners = new Set();
+    this.backendActor = null;
+  }
 
-      return new Promise((resolve, reject) => {
-        authClient.login({
-          identityProvider: II_URL,
-          maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 7 days
-          derivationOrigin: `http://${LOCAL_HOST}:${LOCAL_PORT}`,
-          windowOpenerFeatures:
-            `left=${window.screen.width / 2 - 525 / 2},` +
-            `top=${window.screen.height / 2 - 705 / 2},` +
-            `toolbar=0,location=0,menubar=0,width=525,height=705`,
-          onSuccess: async () => {
-            await this.#handleAuthenticated();
-            resolve();
-          },
-          onError: (error) => {
-            console.error("Login failed:", error);
-            reject(error);
-          },
+  async login() {
+    const days = BigInt(7);
+    const hours = BigInt(24);
+    const nanoseconds = BigInt(3600000000000);
+
+    try {
+      console.log("Starting login process...");
+      const identityProvider = this.getIdentityProviderUrl();
+      console.log("Using Identity Provider:", identityProvider);
+
+      if (import.meta.env.VITE_CANISTER_ID_ICPSEEKER_BACKEND) {
+        const agent = new HttpAgent({
+          host: this.getHost(),
         });
+
+        if (import.meta.env.VITE_DFX_NETWORK !== "ic") {
+          await agent.fetchRootKey();
+        }
+
+        this.backendActor = createActor(
+          import.meta.env.VITE_CANISTER_ID_ICPSEEKER_BACKEND,
+          {
+            agent,
+          }
+        );
+      }
+
+      return await this.authClient.login({
+        identityProvider,
+        maxTimeToLive: days * hours * nanoseconds,
+        windowOpenerFeatures:
+          "width=525,height=705,left=calc(50% - 262.5px),top=calc(50% - 352.5px)",
+        onSuccess: async () => {
+          console.log("Login successful");
+          try {
+            if (this.backendActor) {
+              const authedAgent = await this.getAgent();
+              this.backendActor = createActor(
+                import.meta.env.VITE_CANISTER_ID_ICPSEEKER_BACKEND,
+                {
+                  agent: authedAgent,
+                }
+              );
+              await this.backendActor.login();
+            }
+            window.location.href = "/profile-setup";
+          } catch (error) {
+            console.error("Failed to initialize backend:", error);
+
+            window.location.href = "/profile-setup";
+          }
+        },
+        onError: (error) => {
+          console.error("Login error:", error);
+        },
       });
     } catch (error) {
-      console.error("Login process failed:", error);
+      console.error("Login failed:", error);
       throw error;
     }
   }
 
-  static async logout() {
+  getIdentityProviderUrl() {
+    if (import.meta.env.VITE_DFX_NETWORK === "ic") {
+      return "https://identity.ic0.app";
+    }
+
+    const canisterId = import.meta.env.VITE_CANISTER_ID_INTERNET_IDENTITY;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+    if (isSafari) {
+      return `http://127.0.0.1:4943/?canisterId=${canisterId}`;
+    }
+
+    return `http://${canisterId}.localhost:4943`;
+  }
+
+  getHost() {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    return isSafari ? "http://127.0.0.1:4943" : "http://localhost:4943";
+  }
+
+  async getAgent() {
     try {
-      const authClient = await this.init();
-      await authClient.logout();
-      window.location.reload();
+      const identity = await this.authClient.getIdentity();
+      const agent = new HttpAgent({
+        identity,
+        host: this.getHost(),
+      });
+
+      if (import.meta.env.VITE_DFX_NETWORK !== "ic") {
+        await agent.fetchRootKey();
+      }
+
+      return agent;
+    } catch (error) {
+      console.error("Failed to create agent:", error);
+      throw error;
+    }
+  }
+
+  async logout() {
+    try {
+      if (this.backendActor) {
+        try {
+          this.backendActor = null;
+        } catch (error) {
+          console.error("Backend logout error:", error);
+        }
+      }
+      await this.authClient.logout();
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout failed:", error);
       throw error;
     }
   }
 
-  static async isAuthenticated() {
+  async isAuthenticated() {
     try {
-      const authClient = await this.init();
-      return await authClient.isAuthenticated();
+      const authenticated = await this.authClient.isAuthenticated();
+      if (
+        authenticated &&
+        !this.backendActor &&
+        import.meta.env.VITE_CANISTER_ID_ICPSEEKER_BACKEND
+      ) {
+        const agent = await this.getAgent();
+        this.backendActor = createActor(
+          import.meta.env.VITE_CANISTER_ID_ICPSEEKER_BACKEND,
+          {
+            agent,
+          }
+        );
+      }
+      return authenticated;
     } catch (error) {
       console.error("Auth check failed:", error);
       return false;
-    }
-  }
-
-  static async getIdentity() {
-    try {
-      const authClient = await this.init();
-      return authClient.getIdentity();
-    } catch (error) {
-      console.error("Failed to get identity:", error);
-      throw error;
-    }
-  }
-
-  static async #handleAuthenticated() {
-    try {
-      const authClient = await this.init();
-      if (await authClient.isAuthenticated()) {
-        const identity = authClient.getIdentity();
-        const principal = identity.getPrincipal().toString();
-        console.log("Authenticated principal:", principal);
-
-        if (this.#agent) {
-          this.#agent.replaceIdentity(identity);
-        }
-      }
-    } catch (error) {
-      console.error("Handle authentication failed:", error);
     }
   }
 }
