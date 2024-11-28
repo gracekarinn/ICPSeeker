@@ -1,17 +1,18 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&family=Syne:wght@400;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Default font settings */
 html {
-  font-family: 'Syne'; /* Body default to Syne */
+  font-family: 'Syne', sans-serif !important; 
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Plus Jakarta Sans'; /* Headings default to Plus Jakarta Sans */
+  font-family: 'Plus Jakarta Sans', sans-serif !important; 
 }
 
 body {
+  font-family: 'Syne', sans-serif !important; 
   font-size: 1.5rem;
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthManager } from "../../auth/AuthManager";
+import Button from "../Button"; // Asumsikan Button telah diimpor dengan benar
 
 const AuthButton = () => {
   const [authClient, setAuthClient] = useState(null);
@@ -42,28 +43,15 @@ const AuthButton = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <button
-        className="bg-gray-400 text-white font-bold py-2 px-4 rounded opacity-50 cursor-not-allowed"
-        disabled
-      >
-        Loading...
-      </button>
-    );
-  }
-
   return (
-    <button
+    <Button
       onClick={handleAuth}
-      className={`font-bold py-2 px-4 rounded transition-colors ${
-        isAuthenticated
-          ? "bg-red-500 hover:bg-red-700 text-white"
-          : "bg-blue-500 hover:bg-blue-700 text-white"
-      }`}
+      variant="secondary" // Menggunakan varian 'secondary'
+      size="medium" // Menetapkan ukuran
+      isLoading={isLoading} // Menangani loading state
     >
-      {isAuthenticated ? "Logout" : "Login with Internet Identity"}
-    </button>
+      {isAuthenticated ? "Logout" : "Login"}
+    </Button>
   );
 };
 

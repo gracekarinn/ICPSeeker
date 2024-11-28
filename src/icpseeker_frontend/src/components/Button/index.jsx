@@ -22,7 +22,7 @@ const Button = ({
     primary:
       "bg-purple-normal text-white hover:bg-purple-dark focus:ring-purple-normal",
     secondary:
-      "bg-purple-light text-purple-dark hover:bg-purple-normal focus:ring-purple-light",
+      "bg-purple-light text-purple-dark hover:bg-purple-light-hover focus:ring-purple-light",
     neutral:
       "bg-neutral-700 text-white hover:bg-neutral-900 focus:ring-neutral-700",
     gradient:
