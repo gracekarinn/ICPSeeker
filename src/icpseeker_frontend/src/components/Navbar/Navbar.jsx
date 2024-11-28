@@ -1,24 +1,24 @@
 import React from "react";
 import { NavigationItems } from "./NavigationItems.jsx";
-import Button from "../button";
+import AuthButton from "../Auth/AuthButton"; // Pastikan path sudah benar
+import Logo from "../../assets/logo.svg"; 
 
 export default function Navbar() {
     return (
-        <header
-            className="flex flex-wrap gap-10 justify-between items-center px-12 py-3 border-b-4 border-solid border-b-violet-100 max-md:px-5">
-            <img
-                loading="lazy"
-                src="https://s3.coinmarketcap.com/static-gravity/image/2fb1bc84c1494178beef0822179d137d.png"
-                alt="Company Logo"
-                className="object-contain shrink-0 self-stretch my-auto aspect-[3.18] w-[191px]"
-            />
-            <nav
-                className="flex flex-wrap gap-8 items-center self-stretch my-auto text-base font-bold leading-tight text-white min-w-[240px] max-md:max-w-full">
-                <NavigationItems/>
+        <header className="flex justify-between items-center w-full px-12 py-3 bg-gradient-to-r from-gradient-start to-gradient-end shadow-md">
+            <div className="flex-initial">
+                <img
+                    src={Logo}
+                    alt="ICP Seeker Logo"
+                    className="h-10 w-auto" // Customize size as needed
+                />
+            </div>
+            <nav className="flex-grow flex justify-center text-white text-lg">
+                <NavigationItems />
             </nav>
-            <Button variant="secondary" size="medium">
-                Log in
-            </Button>
+            <div className="flex-initial">
+                <AuthButton />  
+            </div>
         </header>
-    )
+    );
 }

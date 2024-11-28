@@ -1,6 +1,6 @@
 import React from "react";
 
-const navigationItems= [
+const navigationItems = [
     { label: "Home", path: "/" },
     { label: "For Businesses", path: "/businesses" },
     { label: "Find a Job", path: "/job" },
@@ -9,13 +9,17 @@ const navigationItems= [
 ];
 
 export const NavigationItems = () => {
-    return navigationItems.map((item) => (
-        <button
-            key={item.path}
-            className="self-stretch my-auto"
-            tabIndex={0}
-        >
-            {item.label}
-        </button>
-    ));
+    return (
+        <div className="flex justify-between flex-grow max-w-2xl mx-auto">
+            {navigationItems.map((item) => (
+                <button
+                    key={item.path}
+                    className="text-white text-lg hover:underline focus:outline-none"
+                    tabIndex={0}
+                >
+                    {item.label}
+                </button>
+            ))}
+        </div>
+    );
 };
