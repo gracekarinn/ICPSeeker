@@ -37,13 +37,15 @@ const LandingPage = () => {
           of your career on our decentralized platform.
         </p>
         <div className="mt-8 flex gap-4">
-          <Button className="bg-gradient-to-r from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800">
-            Start hiring
-          </Button>
+          <Link to="/businesses">
+            <Button className="bg-gradient-to-r from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800">
+              Start hiring
+            </Button>
+          </Link>
           <Link to="/jobs">
             <Button
-              variant="outline"
-              className="text-white border-white hover:bg-white/10"
+              variant="secondary"
+              className="text-purple-custom border-white hover:bg-white/10"
             >
               Find a job
             </Button>
