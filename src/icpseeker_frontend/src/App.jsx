@@ -6,9 +6,9 @@ import JobPage from "./pages/JobPage";
 import VerifyCertificate from "./pages/VerifyCertificate";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
 import Businesses from "./pages/Businesses";
 import AskAI from "./pages/AskAI";
+import CVAnalyzer from "./pages/CVAnalyzer";
 
 const ProtectedRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -56,10 +56,10 @@ function App() {
           }
         />
         <Route
-          path="/dashboard"
+          path="/cvanalyzer"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <CVAnalyzer />
             </ProtectedRoute>
           }
         />
