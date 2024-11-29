@@ -268,11 +268,16 @@ pub async fn create_user(payload: CreateUserPayload) -> UserResponse {
 #[ic_cdk::query]
 #[candid_method(query)]
 pub async fn get_user() -> UserResponse {
-    let user_id = ic_cdk::api::caller().to_string();
+    let principal = ic_cdk::api::caller();
     
-    match UserStorage::get(&user_id) {
-        Some(user) => UserResponse::Success(user),
-        None => UserResponse::Error("User not found".to_string()),
+    match AuthService::get_user_id(&principal) {
+        Some(user_id) => {
+            match UserStorage::get(&user_id) {
+                Some(user) => UserResponse::Success(user),
+                None => UserResponse::Error("User not found".to_string()),
+            }
+        }
+        None => UserResponse::Error("No user associated with this principal".to_string()),
     }
 }
 
@@ -293,15 +298,30 @@ pub async fn get_user_by_id(user_id: String) -> UserResponse {
 pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
     let principal = ic_cdk::api::caller();
     
-    if !AuthService::is_authenticated(&principal) {
-        return UserResponse::Error("Not authenticated".to_string());
-    }
 
     let user_id = match AuthService::get_user_id(&principal) {
         Some(id) => id,
-        None => return UserResponse::Error("User not found".to_string()),
+        None => {
+            let new_user_id = generate_unique_user_id();
+            let user = UserProfile::new(
+                new_user_id.clone(),
+                payload.name.unwrap_or_default(),
+                payload.email.unwrap_or_default(),
+                payload.phone_number.unwrap_or_default(),
+                payload.city.unwrap_or_default(),
+                payload.country.unwrap_or_default(),
+            );
+            
+            match UserStorage::save_with_validation(user.clone()) {
+                Ok(_) => {
+                    AuthService::associate_user_principal(principal, new_user_id.clone());
+                    return UserResponse::Success(user);
+                }
+                Err(e) => return UserResponse::Error(format!("Failed to create user: {:?}", e)),
+            }
+        }
     };
-    
+
     let mut user = match UserStorage::get(&user_id) {
         Some(user) => user,
         None => return UserResponse::Error("User not found".to_string()),
@@ -322,13 +342,17 @@ pub async fn update_user(payload: UpdateUserPayload) -> UserResponse {
     if let Some(country) = payload.country {
         user.country = country;
     }
-    
 
     match UserStorage::update_with_validation(user.clone()) {
         Ok(()) => UserResponse::Success(user),
         Err(e) => UserResponse::Error(format!("Failed to update user: {:?}", e)),
     }
 }
+
+fn generate_unique_user_id() -> String {
+    format!("user_{}", ic_cdk::api::time())
+}
+
 
 #[ic_cdk::update]
 #[candid_method(update)]
@@ -857,28 +881,28 @@ async fn login() -> Result<Session, String> {
     }
 
     let session = AuthService::create_session(principal);
-
+    
     if AuthService::get_user_id(&principal).is_none() {
-        let user_id = principal.to_string();
-        
+        let user_id = generate_unique_user_id(); 
         let user = UserProfile::new(
             user_id.clone(),
-            String::new(), 
+            String::new(),
             String::new(),
             String::new(),
             String::new(),
             String::new(),
         );
-
+        
         match UserStorage::save_with_validation(user) {
             Ok(_) => {
                 AuthService::associate_user_principal(principal, user_id);
+                Ok(session)
             }
-            Err(e) => return Err(format!("Failed to create user profile: {:?}", e)),
+            Err(e) => Err(format!("Failed to create user profile: {:?}", e))
         }
+    } else {
+        Ok(session)
     }
-
-    Ok(session)
 }
 
 #[ic_cdk::query]
