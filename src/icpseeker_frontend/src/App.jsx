@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Businesses from "./pages/Businesses";
+import AskAI from "./pages/AskAI";
 
 const ProtectedRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -45,6 +46,7 @@ function App() {
         <Route path="/jobs" element={<JobPage />} />
         <Route path="/verifycertificate" element={<VerifyCertificate />} />
         <Route path="/businesses" element={<Businesses />} />
+        <Route path="/ask" element={<AskAI />} />
         <Route
           path="/register"
           element={
