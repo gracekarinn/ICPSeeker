@@ -19,7 +19,14 @@
       "dependencies": ["icpseeker_backend"],
       "source": ["src/icpseeker_frontend/dist"],
       "type": "assets",
-      "workspace": "icpseeker_frontend"
+      "build": ["npm run build"],
+      "workspace": "icpseeker_frontend",
+      "headers": {
+        "Content-Security-Policy": "default-src 'self' 'unsafe-eval' 'unsafe-inline' https://identity.ic0.app http://localhost:4943 https://ic0.app; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:",
+        "Referrer-Policy": "strict-origin",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff"
+      }
     }
   },
   "defaults": {
