@@ -26,6 +26,7 @@ export default {
       colors: {
         purple: {
           custom: "#523DC6",
+          baselight: "F6F4FF",
           light: "#efe7fd", 
           "light-hover": "#e7dbfb", 
           "light-active": "#cdb4f8", 

@@ -1,31 +1,42 @@
 import React from "react";
-import Button from "../components/Button"; 
+import Button from "../components/Button"; // Pastikan path ini benar
 
 const JobPage = () => {
   return (
-    <div className="bg-purple-custom text-gray-800 min-h-screen">
-      <div className="max-w-6xl mx-auto py-12 px-4">
-        <h1 className="text-center text-white text-3xl font-bold mb-6">Available Jobs</h1>
-        <p className="mb-6 text-white text-center">
-          Psst... by registering and uploading your CV, you will get access
-          to personalized jobs catered specifically for your skills!
-        </p>
-        <Button variant="secondary" size="medium">Register</Button>
-        <div className="mt-6 flex justify-between items-center">
-          <input
-            type="text"
-            placeholder="Filter"
-            className="form-input mt-1 block w-full border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md"
-          />
-          <Button variant="secondary" size="medium">Filter</Button>
+    <div className="min-h-screen">
+      {/* Bagian atas dengan background custom-purple */}
+      <div className="bg-purple-custom text-white py-12 px-4">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-center text-3xl font-bold mb-6">Available Jobs</h1>
+          <p className="text-center mb-6">
+            Psst... by registering and uploading your CV, you will get access
+            to personalized jobs catered specifically for your skills!
+          </p>
+          <div className="flex justify-center">
+          <Button variant="secondary" size="large">Register</Button>
+          </div>
         </div>
-        <div className="mt-6 grid grid-cols-3 gap-4">
-          {Array.from({ length: 9 }).map((_, idx) => ( // Updated to fill the grid with 9 cards
-            <div key={idx} className="p-4 bg-gray-100 rounded-lg shadow">
-              <h2 className="font-semibold">UI/UX Designer</h2>
-              <p className="text-sm">UI/UX Designer</p>
-            </div>
-          ))}
+      </div>
+
+      {/* Bagian bawah dengan background purple-baselight dan rounded top */}
+      <div className="bg-purple-baselight text-gray-800 py-12 px-4 rounded-t-3xl">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-6 gap-x-4">
+            <input
+              type="text"
+              placeholder=""
+              className="form-input mt-1 block w-full border-2 border-purple-900 shadow-sm focus:border-purple-500 focus:ring focus:ring-purple-custom focus:ring-opacity-50 rounded-md"
+            />
+            <Button variant="primary" size="medium">Filter</Button>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            {Array.from({ length: 9 }).map((_, idx) => (
+              <div key={idx} className="p-4 bg-gray-100 rounded-lg shadow">
+                <h2 className="font-semibold">UI/UX Designer</h2>
+                <p className="text-sm">UI/UX Designer</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
