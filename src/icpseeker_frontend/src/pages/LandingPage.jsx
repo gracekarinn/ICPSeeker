@@ -7,7 +7,7 @@ const LandingPage = () => {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen relative bg-gradient-to-r from-indigo-600 to-indigo-900 text-white flex flex-col justify-center items-center px-4">
+      <div className="min-h-screen relative bg-gradient-to-l from-[#5F0EE7] to-[#350881] text-white flex flex-col justify-center items-center px-4">
         <img
           src="/landing/kanan-atas.png"
           alt="Decorative element"
@@ -26,7 +26,7 @@ const LandingPage = () => {
         <img
           src="/landing/kiri-bawah.png"
           alt="Decorative element"
-          className="absolute top-1/3 translate-y-1/2 left-0 w-48 h-96"
+          className="absolute top-1/3 translate-y-1/3 left-0 w-48 h-96"
         />
         <h1 className="text-5xl font-bold text-center">
           Jobseeking. <br /> Decentralized.
