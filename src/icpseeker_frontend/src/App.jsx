@@ -8,8 +8,6 @@ import LandingPage from "./pages/LandingPage";
 import JobPage from "./pages/JobPage";
 
 
-
-// Komponen ProtectedRoute untuk route yang memerlukan autentikasi
 const ProtectedRoute = ({ children }) => {
   const checkAuth = async () => {
     try {
