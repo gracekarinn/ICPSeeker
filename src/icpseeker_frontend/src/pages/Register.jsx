@@ -25,16 +25,32 @@ const Register = () => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        console.log("Initializing auth...");
         const manager = await AuthManager.create();
+
+        const isAuth = await manager.isAuthenticated();
+        console.log("Is authenticated:", isAuth);
+
+        if (!isAuth) {
+          console.log("Not authenticated, redirecting to login...");
+          navigate("/");
+          return;
+        }
+
+        console.log("Initializing backend actor...");
+        const actor = await manager.initBackendActor();
+        manager.backendActor = actor;
+
         setAuthManager(manager);
+        console.log("Auth initialization complete");
       } catch (error) {
-        console.error("Failed to initialize auth:", error);
-        setError("Authentication initialization failed");
+        console.error("Auth initialization failed:", error);
+        setError("Authentication initialization failed: " + error.message);
       }
     };
 
     initAuth();
-  }, []);
+  }, [navigate]);
 
   const [userProfile, setUserProfile] = useState({
     name: "",
@@ -87,33 +103,49 @@ const Register = () => {
     setLoading(true);
     setError("");
 
-    if (!authManager) {
-      setError("Authentication not initialized");
-      setLoading(false);
-      return;
-    }
-
     try {
-      if (!authManager.backendActor) {
-        await authManager.initBackendActor();
+      console.log("Current authManager:", authManager);
+
+      if (!authManager) {
+        throw new Error("Authentication not initialized");
       }
 
+      if (!authManager.backendActor) {
+        console.log("Initializing backend actor...");
+        const actor = await authManager.initBackendActor();
+        authManager.backendActor = actor;
+      }
+
+      console.log("Creating login session...");
       await authManager.backendActor.login();
 
+      console.log("Checking if user exists...");
+      const userExists = await authManager.backendActor.get_user();
+      console.log("User exists response:", userExists);
+
+      const userPayload = {
+        name: userProfile.name,
+        email: userProfile.email,
+        phone_number: userProfile.phone_number,
+        city: userProfile.city,
+        country: userProfile.country,
+      };
+
+      console.log("Sending create/update request with payload:", userPayload);
       const response = await authManager.backendActor.update_user({
-        name: [userProfile.name],
-        email: [userProfile.email],
-        phone_number: [userProfile.phone_number],
-        city: [userProfile.city],
-        country: [userProfile.country],
+        name: [userPayload.name],
+        email: [userPayload.email],
+        phone_number: [userPayload.phone_number],
+        city: [userPayload.city],
+        country: [userPayload.country],
       });
 
-      console.log("Update response:", response);
+      console.log("Create/Update response:", response);
 
       if ("Success" in response) {
         setStep(1);
       } else {
-        setError(response.Error || "Update failed");
+        setError(response.Error || "Failed to create/update user");
       }
     } catch (error) {
       console.error("Profile update error:", error);
@@ -128,16 +160,23 @@ const Register = () => {
     setLoading(true);
     setError("");
 
+    if (!authManager) {
+      setError("Authentication not initialized");
+      setLoading(false);
+      return;
+    }
+
     try {
-      const authManager = await AuthManager.create();
-      const actor = authManager.backendActor;
+      if (!authManager.backendActor) {
+        authManager.backendActor = await authManager.initBackendActor();
+      }
 
       const payload = {
         high_school: [education.high_school],
         university: [education.university],
       };
 
-      const response = await actor.add_education(payload);
+      const response = await authManager.backendActor.add_education(payload);
       if ("Success" in response) {
         setStep(2);
       } else {
@@ -156,11 +195,18 @@ const Register = () => {
     setLoading(true);
     setError("");
 
-    try {
-      const authManager = await AuthManager.create();
-      const actor = authManager.backendActor;
+    if (!authManager) {
+      setError("Authentication not initialized");
+      setLoading(false);
+      return;
+    }
 
-      const response = await actor.add_bank_info(bankInfo);
+    try {
+      if (!authManager.backendActor) {
+        authManager.backendActor = await authManager.initBackendActor();
+      }
+
+      const response = await authManager.backendActor.add_bank_info(bankInfo);
       if ("Success" in response) {
         setStep(3);
       } else {
@@ -179,11 +225,18 @@ const Register = () => {
     setLoading(true);
     setError("");
 
-    try {
-      const authManager = await AuthManager.create();
-      const actor = authManager.backendActor;
+    if (!authManager) {
+      setError("Authentication not initialized");
+      setLoading(false);
+      return;
+    }
 
-      const response = await actor.upload_cv(cv);
+    try {
+      if (!authManager.backendActor) {
+        authManager.backendActor = await authManager.initBackendActor();
+      }
+
+      const response = await authManager.backendActor.upload_cv(cv);
       if (response.cv) {
         navigate("/dashboard");
       } else {
@@ -623,28 +676,36 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-r from-purple-normal to-blue-dark py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow">
-        <StepIndicator currentStep={step} totalSteps={4} />
-
-        <h2 className="text-center text-2xl font-bold mb-8">
-          {step === 0
-            ? "Personal Information"
-            : step === 1
-            ? "Education Details"
-            : step === 2
-            ? "Bank Information"
-            : "Upload CV"}
-        </h2>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-            {error}
+        {!authManager ? (
+          <div className="text-center">
+            <p className="text-gray-600">Initializing authentication...</p>
           </div>
-        )}
+        ) : (
+          <>
+            <StepIndicator currentStep={step} totalSteps={4} />
 
-        {step === 0 && renderUserProfileForm()}
-        {step === 1 && renderEducationForm()}
-        {step === 2 && renderBankInfoForm()}
-        {step === 3 && renderCVForm()}
+            <h2 className="text-center text-2xl font-bold mb-8">
+              {step === 0
+                ? "Personal Information"
+                : step === 1
+                ? "Education Details"
+                : step === 2
+                ? "Bank Information"
+                : "Upload CV"}
+            </h2>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+                {error}
+              </div>
+            )}
+
+            {step === 0 && renderUserProfileForm()}
+            {step === 1 && renderEducationForm()}
+            {step === 2 && renderBankInfoForm()}
+            {step === 3 && renderCVForm()}
+          </>
+        )}
       </div>
     </div>
   );

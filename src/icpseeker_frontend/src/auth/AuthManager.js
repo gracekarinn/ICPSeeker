@@ -44,38 +44,54 @@ export class AuthManager {
       const identityProvider = this.getIdentityProviderUrl();
       console.log("Starting login with provider:", identityProvider);
 
-      const loginResult = await this.authClient.login({
-        identityProvider,
-        maxTimeToLive: BigInt(7) * BigInt(24) * BigInt(3600000000000),
-        onSuccess: async () => {
-          try {
-            this.backendActor = await this.initBackendActor();
+      return new Promise((resolve, reject) => {
+        this.authClient.login({
+          identityProvider,
+          maxTimeToLive: BigInt(7) * BigInt(24) * BigInt(3600000000000),
+          onSuccess: async () => {
+            try {
+              console.log("Login successful, initializing backend...");
+              this.backendActor = await this.initBackendActor();
+              console.log("Backend actor initialized");
 
-            await this.backendActor.login();
+              console.log("Calling backend login...");
+              const loginResult = await this.backendActor.login();
+              console.log("Login result:", loginResult);
 
-            const userResponse = await this.backendActor.get_user();
+              console.log("Getting user info...");
+              const userResponse = await this.backendActor.get_user();
+              console.log("User response:", userResponse);
 
-            if ("Success" in userResponse) {
-              const user = userResponse.Success;
-              if (user.name && user.email) {
-                window.location.href = "/dashboard";
+              if (
+                "Error" in userResponse &&
+                userResponse.Error.includes("not found")
+              ) {
+                console.log("User not found, redirecting to registration...");
+                window.location.href = "/register";
+              } else if ("Success" in userResponse) {
+                const user = userResponse.Success;
+                if (user.name && user.email) {
+                  window.location.href = "/dashboard";
+                } else {
+                  window.location.href = "/register";
+                }
               } else {
                 window.location.href = "/register";
               }
-            } else {
-              window.location.href = "/register";
-            }
-          } catch (error) {
-            console.error("Backend initialization failed:", error);
-            window.location.href = "/profile-setup";
-          }
-        },
-        onError: (error) => {
-          console.error("Login error:", error);
-        },
-      });
 
-      return loginResult;
+              resolve(userResponse);
+            } catch (error) {
+              console.error("Backend initialization failed:", error);
+              window.location.href = "/register";
+              reject(error);
+            }
+          },
+          onError: (error) => {
+            console.error("Login error:", error);
+            reject(error);
+          },
+        });
+      });
     } catch (error) {
       console.error("Login failed:", error);
       throw error;

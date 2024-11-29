@@ -17,7 +17,7 @@ pub struct AuthenticatedUser {
 
 thread_local! {
     static SESSIONS: RefCell<HashMap<Principal, Session>> = RefCell::new(HashMap::new());
-    
+    static PRINCIPAL_TO_USER_MAP: RefCell<HashMap<Principal, String>> = RefCell::new(HashMap::new());
     static USER_PRINCIPALS: RefCell<HashMap<Principal, String>> = RefCell::new(HashMap::new());
 }
 
@@ -54,16 +54,17 @@ impl AuthService {
         })
     }
 
-    pub fn get_user_id(principal: &Principal) -> Option<String> {
-        USER_PRINCIPALS.with(|principals| {
-            principals.borrow().get(principal).cloned()
-        })
+    pub fn associate_user_principal(principal: Principal, user_id: String) {
+        PRINCIPAL_TO_USER_MAP.with(|map| {
+            let mut map = map.borrow_mut();
+            map.insert(principal, user_id);
+        });
     }
 
-    pub fn associate_user_principal(principal: Principal, user_id: String) {
-        USER_PRINCIPALS.with(|principals| {
-            principals.borrow_mut().insert(principal, user_id);
-        });
+    pub fn get_user_id(principal: &Principal) -> Option<String> {
+        PRINCIPAL_TO_USER_MAP.with(|map| {
+            map.borrow().get(principal).cloned()
+        })
     }
 
     pub fn is_authenticated(principal: &Principal) -> bool {
