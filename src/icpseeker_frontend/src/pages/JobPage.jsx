@@ -1,24 +1,28 @@
 import React from "react";
-import Button from "../components/Button"; // Pastikan path ini benar
+import Button from "../components/Button"; 
+import Navbar from "../components/Navbar/Navbar"; 
+import { Link } from "react-router-dom";
 
 const JobPage = () => {
   return (
+    <>
+    <Navbar />
     <div className="min-h-screen">
-      {/* Bagian atas dengan background custom-purple */}
       <div className="bg-purple-custom text-white py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-center text-3xl font-bold mb-6">Available Jobs</h1>
           <p className="text-center mb-6">
-            Psst... by registering and uploading your CV, you will get access
+            Psst... by registering and uploading your CV, you will get access <br/>
             to personalized jobs catered specifically for your skills!
           </p>
           <div className="flex justify-center">
-          <Button variant="secondary" size="large">Register</Button>
+          <Link to="/register">
+            <Button variant="secondary" size="large">Register</Button>
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Bagian bawah dengan background purple-baselight dan rounded top */}
       <div className="bg-purple-baselight text-gray-800 py-12 px-4 rounded-t-3xl">
         <div className="max-w-6xl mx-auto">
           <div className="flex justify-between items-center mb-6 gap-x-4">
@@ -40,6 +44,7 @@ const JobPage = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
