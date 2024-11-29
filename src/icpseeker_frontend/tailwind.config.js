@@ -25,6 +25,7 @@ export default {
       },
       colors: {
         purple: {
+          custom: "#523DC6",
           light: "#efe7fd", 
           "light-hover": "#e7dbfb", 
           "light-active": "#cdb4f8", 
@@ -62,7 +63,7 @@ export default {
         },
         gradient: {
           "start": "#5f0ee7", // Gradient start (Purple)
-          "end": "#470bad", // Gradient end (Purple light)
+          "end": "#350881", // Gradient end (Purple light)
         },
         state: {
           success: "#28a745", // State Success (Green)
