@@ -71,7 +71,7 @@ export class AuthManager {
               } else if ("Success" in userResponse) {
                 const user = userResponse.Success;
                 if (user.name && user.email) {
-                  window.location.href = "/dashboard";
+                  window.location.href = "/";
                 } else {
                   window.location.href = "/register";
                 }
