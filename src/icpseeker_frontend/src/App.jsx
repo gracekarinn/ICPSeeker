@@ -1,11 +1,12 @@
 import React from "react"; 
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Navbar from "./components/Navbar/Navbar";
 import AuthButton from "./components/Auth/AuthButton";
 import { AuthManager } from "./auth/AuthManager";
 import Button from "./components/Button";
 import LandingPage from "./pages/LandingPage";
 import JobPage from "./pages/JobPage";
+import VerifyCertificate from "./pages/VerifyCertificate";
+import Register from "./pages/Register";
 
 
 const ProtectedRoute = ({ children }) => {
@@ -55,7 +56,6 @@ const Dashboard = () => (
 function App() {
   return (
     <BrowserRouter>
-      <Navbar />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/profile-setup" element={
@@ -69,6 +69,8 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/jobs" element={<JobPage />} />
+        <Route path="/verifycertificate" element={<VerifyCertificate />} />
+        <Route path="/register" element={<Register/>} />
       </Routes>
     </BrowserRouter>
   );

@@ -6,7 +6,7 @@ const navigationItems = [
     { label: "For Businesses", path: "/businesses" },
     { label: "Find a Job", path: "/jobs" },
     { label: "Quick Projects", path: "/projects" },
-    { label: "Verify Certificate", path: "/certificate" },
+    { label: "Verify Certificate", path: "/verifycertificate" },
 ];
 
 export const NavigationItems = () => {
