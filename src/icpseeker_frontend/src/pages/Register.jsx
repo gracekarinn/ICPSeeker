@@ -318,7 +318,7 @@ const Register = () => {
 
       const response = await authManager.backendActor.upload_cv(cvPayload);
       if (response.cv) {
-        navigate("/dashboard");
+        navigate("/");
       } else {
         setError(response.message || "Failed to upload CV");
       }
