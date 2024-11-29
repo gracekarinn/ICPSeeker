@@ -27,7 +27,7 @@ const AuthButton = () => {
             if ("Success" in userResponse) {
               const user = userResponse.Success;
               if (user.name && user.email) {
-                navigate("/");
+                navigate("/cvanalyzer");
               } else {
                 navigate("/register");
               }
