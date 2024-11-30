@@ -1,4 +1,4 @@
-![ICPSeeker Logo](/src/icpseeker_frontend/public/landing/logo2.svg)
+![ICPSeeker Logo](/src/icpseeker_frontend/public/logo2.svg)
 
 # ICPSeeker
 By team **grace hati2 jangan lgsg submit**
