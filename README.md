@@ -36,3 +36,23 @@ ICPSeeker's Talent Pool provides businesses with access to a curated database of
 
 ### Payroll Management (For Businesses)
 ICPSeeker's Payroll Management feature streamlines payment processes for businesses, offering secure and automated transactions powered by blockchain, ensuring transparency, accuracy, and efficiency. Here, users can pay and get paid using ICP coins.
+
+## Tech Stack 
+### Frontend
+- **React**: JavaScript framework for building the user interface.
+- **Tailwind CSS**: Utility-first CSS framework for styling our application.
+- **JavaScript**: Primary language for frontend logic.
+
+### Backend
+- DFX (DFINITY Framework): For interacting with the Internet Computer and deploying our application.
+- Rust: Programming language for writing the backend logic in canisters (smart contracts) on the Internet Computer.
+
+### Authentication
+- Internet Identity: Provides secure and decentralized authentication for users.
+
+### Deployment
+- DFINITY Internet Computer (IC): A blockchain network that hosts your decentralized application.
+
+### Others
+- Canister Architecture: Logic and state management for our application.
+- Vite: Bundler for React and Tailwind assets.
