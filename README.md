@@ -13,7 +13,7 @@ By team **grace hati2 jangan lgsg submit**
 - Inefficient job recruiting process
 
 ## GitHub Repository
-[This page!](https://github.com/gracekarinn/ICPSeeker
+[This page!](https://github.com/gracekarinn/ICPSeeker)
 
 ## Demo Video
 [Our demo video](https://youtu.be/6MZOzV7BdrQ)
