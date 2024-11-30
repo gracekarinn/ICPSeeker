@@ -12,7 +12,7 @@ export const RadioButton = ({ filled, labelText, active, onSelect }) => {
   const labelStyle = labelText
     ? `ml-2 ${
         active
-          ? "text-blue-dark"
+          ? "text-white"
           : "text-neutral-500 cursor-not-allowed opacity-50"
       }`
     : "";

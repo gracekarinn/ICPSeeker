@@ -9,6 +9,10 @@ import Login from "./pages/Login";
 import Businesses from "./pages/Businesses";
 import AskAI from "./pages/AskAI";
 import CVAnalyzer from "./pages/CVAnalyzer";
+import LoginBusiness from "./pages/LoginBusiness";
+import JobPostings from "./pages/JobPostings";
+import RegisterBusiness from "./pages/RegisterBusiness";
+import OnBoardingRegister from "./pages/OnBoardingRegister";
 
 const ProtectedRoute = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -64,6 +68,10 @@ function App() {
           }
         />
         <Route path="/login" element={<Login />} />
+        <Route path="/loginbusiness" element={<LoginBusiness />} />
+        <Route path="/jobpostings" element={<JobPostings />} />
+        <Route path="/registerbusiness" element={<RegisterBusiness />} />
+        <Route path="/onboardingregister" element={<OnBoardingRegister />} />
       </Routes>
     </BrowserRouter>
   );
