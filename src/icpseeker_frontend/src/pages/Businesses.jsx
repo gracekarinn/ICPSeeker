@@ -1,5 +1,6 @@
 import React from "react";
 import Navbar from "../components/Navbar/Navbar";
+import { Link } from "react-router-dom";
 
 const Businesses = () => {
   return (
@@ -15,9 +16,11 @@ const Businesses = () => {
               Streamline your hiring process, access top-tier talent, and pay
               seamlessly—anywhere in the world.
             </p>
+            <Link to="/loginbusiness">
             <button className="bg-white text-[#5F0EE7] px-8 py-3 rounded-lg text-lg font-medium hover:bg-opacity-90 transition-colors">
               Start hiring
             </button>
+            </Link>
           </div>
           <div>
             <div className="w-xl">
