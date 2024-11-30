@@ -1,61 +1,38 @@
-# `icpseeker`
+[ICPSeeker Logo](/src/icpseeker_frontend/public/landing/logo2.svg)
 
-Welcome to your new `icpseeker` project and to the Internet Computer development community. By default, creating a new project adds this README and some template files to your project directory. You can edit these template files to customize your project and to include your own code to speed up the development cycle.
+# ICPSeeker
+By team **grace hati2 jangan lgsg submit**
 
-To get started, you might want to explore the project directory structure and the default configuration file. Working with this project in your development environment will not affect any production deployment or identity tokens.
+## Summary
+**ICPSeeker** is a revolutionary Web3 platform built on the Internet Computer, designed to reshape the job market by connecting job seekers and businesses with cutting-edge technology. Seeing the surplus of human resources Indonesia has, we want to build something that could help us and job seekers alike, while simultaneously doing something with a positive impact to our society. It offers secure access through ICP Internet Identity, personalized job recommendations, and a talent pool for businesses to find top candidates efficiently. By leveraging blockchain for certificate verification and **IC Stable Storage** for data reliability, ICPSeeker ensures transparency and authenticity in every interaction. ICPSeeker can be used by both job seekers and businesses (the business dashboard).
 
-To learn more before you start working with `icpseeker`, see the following documentation available online:
+## Key Points
+- Growing workforce 
+- Unemployment numbers
+- Fraud in recruitment process
+- Inefficient job recruiting process
 
-- [Quick Start](https://internetcomputer.org/docs/current/developer-docs/setup/deploy-locally)
-- [SDK Developer Tools](https://internetcomputer.org/docs/current/developer-docs/setup/install)
-- [Rust Canister Development Guide](https://internetcomputer.org/docs/current/developer-docs/backend/rust/)
-- [ic-cdk](https://docs.rs/ic-cdk)
-- [ic-cdk-macros](https://docs.rs/ic-cdk-macros)
-- [Candid Introduction](https://internetcomputer.org/docs/current/developer-docs/backend/candid/)
+## GitHub Repository
+[This page!](https://github.com/gracekarinn/ICPSeeker
 
-If you want to start working on your project right away, you might want to try the following commands:
+## Demo Video
+[Our demo video](https://youtu.be/6MZOzV7BdrQ)
 
-```bash
-cd icpseeker/
-dfx help
-dfx canister --help
-```
+## Features
+### Internet Identity login and sign-up process
+ICPSeeker uses ICP Internet Identity for a seamless and secure login and signup process, enabling users to authenticate without passwords while protecting their personal data through blockchain technology.
 
-## Running the project locally
+### CV Analyzer
+ICPSeeker has a built-in CV Analyzer, using AI to assess user resumes, providing tailored job recommendations and insights to align skills with the best opportunities in the market.
 
-If you want to test your project locally, you can use the following commands:
+### AI Assistant
+ICPSeeker has an AI Assistant in the form of a chatbot. This easy-to-use feature allows job seekers to get quick answers to their career and/or recruitment processes.
 
-```bash
-# Starts the replica, running in the background
-dfx start --background
+### Jobs & Projects Posting (For Businesses)
+For businesses, ICPSeeker provides a dashboard to post job openings and provide freelance project opportunities. This streamlines the recruitment process and removes unnecessary steps, allowing businesses to efficiently find top talent. 
 
-# Deploys your canisters to the replica and generates your candid interface
-dfx deploy
-```
+### Talent Pool (For Businesses)
+ICPSeeker's Talent Pool provides businesses with access to a curated database of skilled professionals, complete with verified credentials, enabling efficient and targeted recruitment.
 
-Once the job completes, your application will be available at `http://localhost:4943?canisterId={asset_canister_id}`.
-
-If you have made changes to your backend canister, you can generate a new candid interface with
-
-```bash
-npm run generate
-```
-
-at any time. This is recommended before starting the frontend development server, and will be run automatically any time you run `dfx deploy`.
-
-If you are making frontend changes, you can start a development server with
-
-```bash
-npm start
-```
-
-Which will start a server at `http://localhost:8080`, proxying API requests to the replica at port 4943.
-
-### Note on frontend environment variables
-
-If you are hosting frontend code somewhere without using DFX, you may need to make one of the following adjustments to ensure your project does not fetch the root key in production:
-
-- set`DFX_NETWORK` to `ic` if you are using Webpack
-- use your own preferred method to replace `process.env.DFX_NETWORK` in the autogenerated declarations
-  - Setting `canisters -> {asset_canister_id} -> declarations -> env_override to a string` in `dfx.json` will replace `process.env.DFX_NETWORK` with the string in the autogenerated declarations
-- Write your own `createActor` constructor
+### Payroll Management (For Businesses)
+ICPSeeker's Payroll Management feature streamlines payment processes for businesses, offering secure and automated transactions powered by blockchain, ensuring transparency, accuracy, and efficiency. Here, users can pay and get paid using ICP coins.
